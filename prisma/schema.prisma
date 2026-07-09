@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- Identity & auth (Slice 1 models only — schema grows per slice) ----------
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  APPLE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+  BANNED
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  phone        String?      @unique
+  passwordHash String? // null for pure-OAuth accounts
+  authProvider AuthProvider @default(EMAIL)
+
+  role   UserRole   @default(USER)
+  status UserStatus @default(ACTIVE)
+
+  emailVerifiedAt DateTime?
+
+  // --- birthday core (denormalized for indexed matching) ---
+  birthDate  DateTime @db.Date
+  birthMonth Int // 1–12
+  birthDay   Int // 1–31
+  ageBracket String? // "18-25", "26-35"... recomputed by a nightly job
+
+  gender Gender
+
+  // --- the hybrid community toggle ---
+  autoJoinBirthdayCommunities Boolean @default(true)
+
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+  otpCodes      OtpCode[]
+
+  @@index([birthMonth, birthDay]) // THE query of this app: "who shares my birthday"
+  @@index([ageBracket])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // sha256 — the raw token is never stored
+  familyId  String // rotation family: reuse of an old token revokes the whole family
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+model OtpCode {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash   String
+  purpose    String // EMAIL_VERIFY | PASSWORD_RESET
+  expiresAt  DateTime
+  consumedAt DateTime?
+  attempts   Int       @default(0)
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, purpose])
+  @@map("otp_codes")
+}
