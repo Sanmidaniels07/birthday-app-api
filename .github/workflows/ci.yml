@@ -18,7 +18,7 @@ jobs:
 
       - run: npm ci
 
-      - run: npnpx prisma generate
+      - run: npx prisma generate
         name: Generate Prisma client
 
       - run: npm run typecheck
