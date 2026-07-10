@@ -9,6 +9,8 @@ import { globalLimiter } from './middleware/rate-limit.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { healthRouter } from './modules/health/health-routes.js';
 import { mountDocs } from './docs/swagger.js';
+import { authRouter } from './modules/auth/auth.routes.js';
+import cookieParser from 'cookie-parser';
 
 export function createApp() {
   const app = express();
@@ -22,7 +24,8 @@ export function createApp() {
     credentials: true,                                
   }));
   app.use(compression());                            
-  app.use(express.json({ limit: '1mb' }));            
+  app.use(express.json({ limit: '1mb' }));          
+  app.use(cookieParser())  
   app.use(pinoHttp({
     logger,
     autoLogging: {
@@ -39,6 +42,7 @@ export function createApp() {
   app.use('/api/v1', v1);
 
   v1.use('/health', healthRouter);
+  v1.use('/auth', authRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -1,0 +1,284 @@
+import { prisma } from "../../lib/prisma.js";
+import { logger } from "../../lib/logger.js";
+import { hashPassword, generateOtp, hashOtp, verifyOtp } from "./auth.crypto.js";
+import { ageOn, type SignupInput, type VerifyEmailInput } from "./auth.schemas.js";
+import { verificationEmail } from "../../templates/verification.template.js";
+import { sendEmail } from "../../lib/email.js";
+import { isProd } from "../../config/env.js";
+import { BadRequestError } from "../../utils/errors.js";
+
+import { randomUUID } from "node:crypto";
+import { UnauthorizedError, ForbiddenError } from "../../utils/errors.js";
+import { verifyPassword, generateRefreshToken, hashRefreshToken } from "./auth.crypto.js";
+import { signAccessToken } from "./auth.tokens.js";
+import { env } from "../../config/env.js";
+import type { LoginInput } from "./auth.schemas.js";
+
+const OTP_TTL_MIN = 10;
+const MAX_OTP_ATTEMPTS = 5;
+
+export function computeAgeBracket(age: number): string | null {
+  if (age < 18) return null;
+  if (age <= 25) return "18-25";
+  if (age <= 35) return "26-35";
+  if (age <= 45) return "36-45";
+  if (age <= 60) return "46-60";
+  return "60+";
+}
+
+interface SessionMeta {
+  userAgent?: string;
+  ip?: string;
+}
+
+interface AuthResult {
+  accessToken: string;
+  refreshToken: string; 
+  user: { id: string; fullName: string; email: string; role: string };
+}
+
+/** Build and fire the verification email without blocking the request. */
+function dispatchVerificationEmail(email: string, fullName: string, otp: string): void {
+  const mail = verificationEmail({
+    name: fullName.split(" ")[0] ?? "there",
+    code: otp,
+    ttlMinutes: OTP_TTL_MIN,
+  });
+  void sendEmail({ to: email, ...mail }).catch((err) =>
+    logger.error({ err, email }, "verification email failed"),
+  );
+}
+
+export async function signup(input: SignupInput): Promise<{ email: string }> {
+  const dob = new Date(`${input.birthDate}T00:00:00Z`);
+  const age = ageOn(new Date(), dob);
+
+  const existing = await prisma.user.findUnique({
+    where: { email: input.email },
+  });
+
+  // Verified account already owns this email → do nothing, reveal nothing.
+  if (existing?.emailVerifiedAt) {
+    logger.info({ email: input.email }, "signup attempt on verified email (no-op)");
+    return { email: input.email };
+  }
+
+  const passwordHash = await hashPassword(input.password);
+  const otp = generateOtp();
+
+  await prisma.$transaction(async (tx) => {
+    const user = existing
+      ? await tx.user.update({
+          // unverified account: claimable — overwrite with the new attempt
+          where: { id: existing.id },
+          data: {
+            fullName: input.fullName,
+            passwordHash,
+            birthDate: dob,
+            birthMonth: dob.getUTCMonth() + 1,
+            birthDay: dob.getUTCDate(),
+            ageBracket: computeAgeBracket(age),
+            gender: input.gender,
+            phone: input.phone ?? null,
+          },
+        })
+      : await tx.user.create({
+          data: {
+            fullName: input.fullName,
+            email: input.email,
+            passwordHash,
+            birthDate: dob,
+            birthMonth: dob.getUTCMonth() + 1,
+            birthDay: dob.getUTCDate(),
+            ageBracket: computeAgeBracket(age),
+            gender: input.gender,
+            phone: input.phone ?? null,
+          },
+        });
+
+    // One live OTP per purpose: kill any previous codes, then create the new one.
+    await tx.otpCode.deleteMany({
+      where: { userId: user.id, purpose: "EMAIL_VERIFY" },
+    });
+    await tx.otpCode.create({
+      data: {
+        userId: user.id,
+        codeHash: hashOtp(otp),
+        purpose: "EMAIL_VERIFY",
+        expiresAt: new Date(Date.now() + OTP_TTL_MIN * 60_000),
+      },
+    });
+  });
+
+  dispatchVerificationEmail(input.email, input.fullName, otp);
+
+  if (!isProd) logger.debug({ otp }, "OTP (dev convenience log)");
+  return { email: input.email };
+}
+
+export async function verifyEmail(input: VerifyEmailInput): Promise<{ verified: true }> {
+  const user = await prisma.user.findUnique({ where: { email: input.email } });
+
+  // Idempotent success: already verified → just say yes.
+  if (user?.emailVerifiedAt) return { verified: true };
+
+  // One generic failure for every wrong path — no enumeration oracle.
+  const fail = () => new BadRequestError("Invalid or expired code");
+
+  if (!user) throw fail();
+
+  const otp = await prisma.otpCode.findFirst({
+    where: { userId: user.id, purpose: "EMAIL_VERIFY", consumedAt: null },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!otp) throw fail();
+  if (otp.expiresAt < new Date()) throw fail();
+  if (otp.attempts >= MAX_OTP_ATTEMPTS) throw fail();
+
+  if (!verifyOtp(otp.codeHash, input.code)) {
+    // Count the failed guess even though the request errors.
+    await prisma.otpCode.update({
+      where: { id: otp.id },
+      data: { attempts: { increment: 1 } },
+    });
+    throw fail();
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerifiedAt: new Date() },
+    }),
+    prisma.otpCode.update({
+      where: { id: otp.id },
+      data: { consumedAt: new Date() },
+    }),
+  ]);
+
+  return { verified: true };
+}
+
+export async function resendOtp(email: string): Promise<{ email: string }> {
+  const user = await prisma.user.findUnique({ where: { email } });
+
+  // Unknown or already-verified: pretend we sent. No enumeration oracle.
+  if (!user || user.emailVerifiedAt) return { email };
+
+  const otp = generateOtp();
+  await prisma.$transaction(async (tx) => {
+    await tx.otpCode.deleteMany({
+      where: { userId: user.id, purpose: "EMAIL_VERIFY" },
+    });
+    await tx.otpCode.create({
+      data: {
+        userId: user.id,
+        codeHash: hashOtp(otp),
+        purpose: "EMAIL_VERIFY",
+        expiresAt: new Date(Date.now() + OTP_TTL_MIN * 60_000),
+      },
+    });
+  });
+
+  dispatchVerificationEmail(email, user.fullName, otp);
+
+  if (!isProd) logger.debug({ otp }, "resent OTP (dev convenience log)");
+  return { email };
+}
+
+
+
+const refreshExpiry = () =>
+  new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+async function issueSession(
+  user: { id: string; fullName: string; email: string; role: "USER" | "MODERATOR" | "ADMIN" },
+  familyId: string,
+  meta: SessionMeta,
+): Promise<AuthResult> {
+  const refreshToken = generateRefreshToken();
+
+  await prisma.refreshToken.create({
+    data: {
+      userId: user.id,
+      tokenHash: hashRefreshToken(refreshToken),
+      familyId,
+      expiresAt: refreshExpiry(),
+      userAgent: meta.userAgent ?? null,
+      ip: meta.ip ?? null,
+    },
+  });
+
+  return {
+    accessToken: signAccessToken({ sub: user.id, role: user.role }),
+    refreshToken,
+    user: { id: user.id, fullName: user.fullName, email: user.email, role: user.role },
+  };
+}
+
+export async function login(input: LoginInput, meta: SessionMeta): Promise<AuthResult> {
+  const user = await prisma.user.findUnique({ where: { email: input.email } });
+
+  
+  if (!user?.passwordHash || !(await verifyPassword(user.passwordHash, input.password))) {
+    throw new UnauthorizedError("Invalid email or password");
+  }
+
+  // Only AFTER the password is proven do we reveal account state —
+  // an attacker without the password learns nothing extra.
+  if (!user.emailVerifiedAt) {
+    throw new ForbiddenError("Please verify your email first");
+  }
+  if (user.status !== "ACTIVE") {
+    throw new ForbiddenError("This account is not active");
+  }
+
+  await prisma.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date() } });
+
+  // Fresh login = fresh family (one family per device/session).
+  return issueSession(user, randomUUID(), meta);
+}
+
+export async function refresh(presentedToken: string, meta: SessionMeta): Promise<AuthResult> {
+  const tokenHash = hashRefreshToken(presentedToken);
+  const stored = await prisma.refreshToken.findUnique({
+    where: { tokenHash },
+    include: { user: true },
+  });
+
+  if (!stored) throw new UnauthorizedError("Invalid session");
+
+  // ── REUSE DETECTED ──
+  // This token was already consumed. Two parties hold one token;
+  // one of them is a thief. Kill the whole family.
+  if (stored.revokedAt) {
+    await prisma.refreshToken.updateMany({
+      where: { familyId: stored.familyId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    logger.warn(
+      { userId: stored.userId, familyId: stored.familyId },
+      "refresh token REUSE — family revoked",
+    );
+    throw new UnauthorizedError("Session expired, please log in again");
+  }
+
+  if (stored.expiresAt < new Date()) throw new UnauthorizedError("Session expired");
+  if (stored.user.status !== "ACTIVE") throw new UnauthorizedError("This account is not active");
+
+  // Rotate: consume this token, issue the next in the SAME family.
+  await prisma.refreshToken.update({
+    where: { id: stored.id },
+    data: { revokedAt: new Date() },
+  });
+
+  return issueSession(stored.user, stored.familyId, meta);
+}
+
+export async function logout(presentedToken: string | undefined): Promise<void> {
+  if (!presentedToken) return; 
+  await prisma.refreshToken.updateMany({
+    where: { tokenHash: hashRefreshToken(presentedToken) },
+    data: { revokedAt: new Date() },
+  });
+}
