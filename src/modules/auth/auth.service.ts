@@ -282,3 +282,25 @@ export async function logout(presentedToken: string | undefined): Promise<void> 
     data: { revokedAt: new Date() },
   });
 }
+
+export async function getMe(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      role: true,
+      birthDate: true,
+      birthMonth: true,
+      birthDay: true,
+      ageBracket: true,
+      gender: true,
+      autoJoinBirthdayCommunities: true,
+      emailVerifiedAt: true,
+      createdAt: true,
+    },
+  });
+  if (!user) throw new UnauthorizedError('Account no longer exists');
+  return user;
+}

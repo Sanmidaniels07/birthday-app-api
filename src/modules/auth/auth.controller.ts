@@ -52,3 +52,8 @@ export async function logout(req: Request, res: Response) {
   clearRefreshCookie(res);
   noContent(res);
 }
+
+export async function me(req: Request, res: Response) {
+  const user = await authService.getMe(req.user!.sub);
+  ok(res, user);
+}

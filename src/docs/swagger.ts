@@ -1,12 +1,8 @@
 import swaggerUi from 'swagger-ui-express';
 import type { Express } from 'express';
+import { buildPaths } from './openapi.js';
+import '../modules/auth/auth.docs.js'; 
 
-/**
- * OpenAPI spec served at /docs.
- * For now the spec is hand-written. From the auth slice onward we generate
- * paths from the same zod schemas used for validation, so the docs
- * physically cannot drift from what the API actually does.
- */
 export const openApiSpec = {
   openapi: '3.1.0',
   info: {
@@ -17,8 +13,18 @@ export const openApiSpec = {
       '`{ data, meta? }` on success and `{ error: { code, message, details? } }` on failure.',
   },
   servers: [{ url: 'http://localhost:4000/api/v1', description: 'Local' }],
-  tags: [{ name: 'Health', description: 'Liveness and readiness probes' }],
+  tags: [
+    { name: 'Health', description: 'Liveness and readiness probes' },
+    { name: 'Auth', description: 'Signup, verification, sessions' },
+  ],
+  components: {
+    securitySchemes: {
+      bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+    },
+  },
   paths: {
+    ...buildPaths(),
+
     '/health': {
       get: {
         tags: ['Health'],
