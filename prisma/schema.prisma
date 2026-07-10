@@ -39,6 +39,17 @@ enum ProfileVisibility {
   PRIVATE
 }
 
+enum CommunityType {
+  BIRTHDAY    
+  BIRTH_MONTH  
+  AGE_BRACKET  
+}
+
+enum JoinMethod {
+  AUTO   
+  MANUAL  
+}
+
 model User {
   id           String       @id @default(cuid())
   fullName     String
@@ -69,6 +80,7 @@ model User {
   otpCodes      OtpCode[]
   profile       Profile?
   interests     UserInterest[]
+  memberships CommunityMembership[]
 
   @@index([birthMonth, birthDay])
   @@index([ageBracket])
@@ -155,4 +167,41 @@ model UserInterest {
   @@id([userId, interestId])
   @@index([interestId])
   @@map("user_interests")
+}
+
+model BirthdayCommunity {
+  id   String        @id @default(cuid())
+  type CommunityType
+
+  month   Int?
+  day     Int?
+  bracket String?
+
+  name        String
+  description String?
+  coverTint   String?
+  memberCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships CommunityMembership[]
+
+  @@unique([type, month, day, bracket])
+  @@map("birthday_communities")
+}
+
+model CommunityMembership {
+  id          String            @id @default(cuid())
+  userId      String
+  communityId String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  community   BirthdayCommunity @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  joinMethod JoinMethod
+  joinedAt   DateTime   @default(now())
+
+  @@unique([userId, communityId])
+  @@index([communityId, joinMethod])
+  @@map("community_memberships")
 }

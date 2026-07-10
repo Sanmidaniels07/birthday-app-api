@@ -3,6 +3,8 @@ import type { Express } from 'express';
 import { buildPaths } from './openapi.js';
 import '../modules/auth/auth.docs.js';     
 import '../modules/profiles/profiles.docs.js'; 
+import '../modules/communities/communities.docs.js';
+import '../modules/matching/matching.docs.js'
 
 export const openApiSpec = {
   openapi: '3.1.0',
@@ -18,6 +20,9 @@ export const openApiSpec = {
     { name: 'Health', description: 'Liveness and readiness probes' },
     { name: 'Auth', description: 'Signup, verification, sessions' },
     { name: 'Profiles', description: 'Profile setup, privacy, interests, avatar' },
+    { name: 'Communities', description: 'Birthday communities: browse, join, the auto-join toggle' },   
+    { name: 'Matching', description: 'Birthday-based people discovery' },
+
   ],
   components: {
     securitySchemes: {

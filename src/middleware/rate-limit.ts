@@ -32,3 +32,10 @@ export const uploadLimiter = rateLimit({
   limit: 20,
   ...shared,
 });
+
+/** Discovery is compute-heavy and scrape-attractive. */
+export const discoverLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 15,
+  ...shared,
+});

@@ -13,6 +13,7 @@ import { verifyPassword, generateRefreshToken, hashRefreshToken } from "./auth.c
 import { signAccessToken } from "./auth.tokens.js";
 import { env } from "../../config/env.js";
 import type { LoginInput } from "./auth.schemas.js";
+import { syncUserCommunities } from "../communities/communities.sync.js";
 
 const OTP_TTL_MIN = 10;
 const MAX_OTP_ATTEMPTS = 5;
@@ -150,11 +151,16 @@ export async function verifyEmail(input: VerifyEmailInput): Promise<{ verified: 
       where: { id: user.id },
       data: { emailVerifiedAt: new Date() },
     }),
+    
     prisma.otpCode.update({
       where: { id: otp.id },
       data: { consumedAt: new Date() },
     }),
   ]);
+
+  void syncUserCommunities(user.id).catch((err) =>
+    logger.error({ err, userId: user.id }, "community sync after verification failed"),
+  );
 
   return { verified: true };
 }
