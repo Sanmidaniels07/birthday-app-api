@@ -27,10 +27,17 @@ export async function discoverMatches(userId: string, limit: number): Promise<Sc
 
   const myInterestIds = me.interests.map((i) => i.interestId);
 
+  // Users with a block in either direction never enter the pool.
+  const blocks = await prisma.block.findMany({
+    where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
+    select: { blockerId: true, blockedId: true },
+  });
+  const excludedIds = blocks.map((b) => (b.blockerId === userId ? b.blockedId : b.blockerId));
+
   // Visibility doctrine, applied at generation: PRIVATE and profile-less
   // users never enter the candidate pool at all.
   const visible = {
-    id: { not: userId },
+    id: { notIn: [userId, ...excludedIds] },
     status: 'ACTIVE' as const,
     emailVerifiedAt: { not: null },
     profile: { is: { visibility: { not: 'PRIVATE' as const } } },

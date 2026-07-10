@@ -3,6 +3,7 @@ import { BadRequestError, ConflictError, NotFoundError } from '../../utils/error
 import type { SetupProfileInput } from './profiles.schemas.js';
 import type { UpdateProfileInput } from './profiles.schemas.js';
 import { cloudinaryEnabled, signAvatarUpload, MEDIA_ROOT } from '../../lib/cloudinary.js';
+import { blockExistsBetween, areFriends, } from '../social/social.helpers.js';
 
 
 
@@ -83,17 +84,43 @@ export async function getProfileByUsername(username: string, viewerId: string) {
     },
   });
 
-  
   const isOwner = profile?.userId === viewerId;
+
+  // Blocked in either direction = does not exist, same as missing/private.
+  if (profile && !isOwner && (await blockExistsBetween(viewerId, profile.userId))) {
+    throw new NotFoundError('Profile');
+  }
+
   if (!profile || (profile.visibility === 'PRIVATE' && !isOwner)) {
     throw new NotFoundError('Profile');
   }
-  if (profile.visibility === 'FRIENDS_ONLY' && !isOwner) {
-    throw new NotFoundError('Profile'); 
+
+  // Relationship context — one parallel batch, no waterfalls.
+  const [friends, pendingRequest, followRow] = isOwner
+    ? [false, null, null]
+    : await Promise.all([
+        areFriends(viewerId, profile.userId),
+        prisma.friendship.findFirst({
+          where: {
+            status: 'PENDING',
+            OR: [
+              { requesterId: viewerId, addresseeId: profile.userId },
+              { requesterId: profile.userId, addresseeId: viewerId },
+            ],
+          },
+          select: { id: true, requesterId: true },
+        }),
+        prisma.follow.findUnique({
+          where: { followerId_followeeId: { followerId: viewerId, followeeId: profile.userId } },
+          select: { createdAt: true },
+        }),
+      ]);
+
+  // The P3 TODO, honored: FRIENDS_ONLY admits friends.
+  if (profile.visibility === 'FRIENDS_ONLY' && !isOwner && !friends) {
+    throw new NotFoundError('Profile');
   }
 
-  // Assemble the viewer-appropriate shape. Privacy toggles GATE fields —
-  // ungated data never even enters the response object.
   return {
     username: profile.username,
     displayName: profile.displayName,
@@ -101,7 +128,19 @@ export async function getProfileByUsername(username: string, viewerId: string) {
     avatarUrl: profile.avatarUrl,
     blobTint: profile.blobTint,
     isOwner,
-    // Day + month are the app's public soul — always visible.
+    // Relationship context for the frontend's button logic:
+    relationship: isOwner
+      ? null
+      : {
+          isFriend: friends,
+          isFollowing: followRow !== null,
+          pendingRequest: pendingRequest
+            ? {
+                requestId: pendingRequest.id,
+                direction: pendingRequest.requesterId === viewerId ? ('outgoing' as const) : ('incoming' as const),
+              }
+            : null,
+        },
     birthMonth: profile.user.birthMonth,
     birthDay: profile.user.birthDay,
     ...(profile.showBirthYear || isOwner
@@ -181,4 +220,3 @@ export async function confirmAvatar(userId: string, publicId: string) {
   });
   return profile;
 }
-

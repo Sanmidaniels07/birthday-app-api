@@ -61,6 +61,19 @@ registerEndpoint({
 
 registerEndpoint({
   method: 'get', path: '/profiles/{username}', tag: 'Profiles',
-  summary: 'View a profile (privacy-gated per viewer)', secured: true,
-  responses: { '200': { description: 'The visible fields for this viewer' }, '404': { description: 'Not found or private' } },
+  summary: 'View a profile (privacy-gated; includes relationship context)', secured: true,
+  responses: {
+    '200': {
+      description: 'The visible fields for this viewer, plus relationship (null when own profile)',
+      example: {
+        data: {
+          username: 'maya_s', displayName: 'Maya', bio: null, avatarUrl: null, blobTint: 'blush',
+          isOwner: false,
+          relationship: { isFriend: false, isFollowing: true, pendingRequest: { requestId: 'ckx…', direction: 'outgoing' } },
+          birthMonth: 5, birthDay: 14,
+        },
+      },
+    },
+    '404': { description: 'Not found, private, friends-only (non-friend), or blocked' },
+  },
 });

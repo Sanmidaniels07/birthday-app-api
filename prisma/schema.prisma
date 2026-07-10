@@ -50,6 +50,12 @@ enum JoinMethod {
   MANUAL  
 }
 
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
 model User {
   id           String       @id @default(cuid())
   fullName     String
@@ -81,6 +87,12 @@ model User {
   profile       Profile?
   interests     UserInterest[]
   memberships CommunityMembership[]
+  sentFriendships     Friendship[] @relation("FriendshipRequester")
+  receivedFriendships Friendship[] @relation("FriendshipAddressee")
+  following           Follow[]     @relation("Follower")
+  followers           Follow[]     @relation("Followee")
+  blocksInitiated     Block[]      @relation("Blocker")
+  blocksReceived      Block[]      @relation("Blocked")
 
   @@index([birthMonth, birthDay])
   @@index([ageBracket])
@@ -204,4 +216,43 @@ model CommunityMembership {
   @@unique([userId, communityId])
   @@index([communityId, joinMethod])
   @@map("community_memberships")
+}
+
+model Friendship {
+  id          String           @id @default(cuid())
+  requesterId String
+  addresseeId String
+  requester   User             @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee   User             @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  respondedAt DateTime?
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status]) // "my pending requests" inbox
+  @@map("friendships")
+}
+
+model Follow {
+  followerId String
+  followeeId String
+  follower   User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followee   User     @relation("Followee", fields: [followeeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([followerId, followeeId])
+  @@index([followeeId]) // "who follows me"
+  @@map("follows")
+}
+
+model Block {
+  blockerId String
+  blockedId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("blocks")
 }

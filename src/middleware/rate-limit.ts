@@ -39,3 +39,10 @@ export const discoverLimiter = rateLimit({
   limit: 15,
   ...shared,
 });
+
+/** Social writes — friend requests are the spam/harassment vector. */
+export const socialWriteLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 30,
+  ...shared,
+});

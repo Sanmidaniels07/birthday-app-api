@@ -5,6 +5,7 @@ import '../modules/auth/auth.docs.js';
 import '../modules/profiles/profiles.docs.js'; 
 import '../modules/communities/communities.docs.js';
 import '../modules/matching/matching.docs.js'
+import '../modules/social/social.docs.js';
 
 export const openApiSpec = {
   openapi: '3.1.0',
@@ -22,6 +23,7 @@ export const openApiSpec = {
     { name: 'Profiles', description: 'Profile setup, privacy, interests, avatar' },
     { name: 'Communities', description: 'Birthday communities: browse, join, the auto-join toggle' },   
     { name: 'Matching', description: 'Birthday-based people discovery' },
+    { name: 'Social', description: 'Friends, requests, follows, blocks' },
 
   ],
   components: {
