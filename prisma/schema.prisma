@@ -33,6 +33,12 @@ enum UserStatus {
   BANNED
 }
 
+enum ProfileVisibility {
+  PUBLIC
+  FRIENDS_ONLY
+  PRIVATE
+}
+
 model User {
   id           String       @id @default(cuid())
   fullName     String
@@ -61,6 +67,8 @@ model User {
 
   refreshTokens RefreshToken[]
   otpCodes      OtpCode[]
+  profile       Profile?
+  interests     UserInterest[]
 
   @@index([birthMonth, birthDay])
   @@index([ageBracket])
@@ -97,4 +105,54 @@ model OtpCode {
 
   @@index([userId, purpose])
   @@map("otp_codes")
+}
+
+model Profile {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  displayName String
+  username    String  @unique
+  bio         String? @db.VarChar(500)
+  avatarUrl   String?
+  blobTint    String?
+
+  visibility       ProfileVisibility @default(PUBLIC)
+  showBirthYear    Boolean           @default(false)
+  showAge          Boolean           @default(true)
+  showLocation     Boolean           @default(true)
+  showOnlineStatus Boolean           @default(true)
+
+  city      String?
+  country   String?
+  latitude  Float?
+  longitude Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city, country])
+  @@map("profiles")
+}
+
+model Interest {
+  id    String         @id @default(cuid())
+  name  String         @unique
+  slug  String         @unique
+  users UserInterest[]
+
+  @@map("interests")
+}
+
+model UserInterest {
+  userId     String
+  interestId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest   Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([userId, interestId])
+  @@index([interestId])
+  @@map("user_interests")
 }

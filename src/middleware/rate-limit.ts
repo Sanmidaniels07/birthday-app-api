@@ -27,6 +27,8 @@ export const otpLimiter = rateLimit({
   ...shared,
 });
 
-// NOTE: in-memory limiters — correct for a single Render instance.
-// When we scale horizontally we swap in rate-limit-redis (Upstash)
-// as the store, without touching any route code.
+export const uploadLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 20,
+  ...shared,
+});

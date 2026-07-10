@@ -11,6 +11,7 @@ import { healthRouter } from './modules/health/health-routes.js';
 import { mountDocs } from './docs/swagger.js';
 import { authRouter } from './modules/auth/auth.routes.js';
 import cookieParser from 'cookie-parser';
+import { profilesRouter } from './modules/profiles/profiles.routes.js';
 
 export function createApp() {
   const app = express();
@@ -43,6 +44,7 @@ export function createApp() {
 
   v1.use('/health', healthRouter);
   v1.use('/auth', authRouter);
+  v1.use('/profiles', profilesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

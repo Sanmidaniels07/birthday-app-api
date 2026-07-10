@@ -1,7 +1,8 @@
 import swaggerUi from 'swagger-ui-express';
 import type { Express } from 'express';
 import { buildPaths } from './openapi.js';
-import '../modules/auth/auth.docs.js'; 
+import '../modules/auth/auth.docs.js';     
+import '../modules/profiles/profiles.docs.js'; 
 
 export const openApiSpec = {
   openapi: '3.1.0',
@@ -16,6 +17,7 @@ export const openApiSpec = {
   tags: [
     { name: 'Health', description: 'Liveness and readiness probes' },
     { name: 'Auth', description: 'Signup, verification, sessions' },
+    { name: 'Profiles', description: 'Profile setup, privacy, interests, avatar' },
   ],
   components: {
     securitySchemes: {

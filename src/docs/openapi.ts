@@ -2,7 +2,7 @@ import { z, type ZodType } from 'zod';
 
 
 interface EndpointDoc {
-  method: 'get' | 'post' | 'patch' | 'delete';
+  method: 'get' | 'post' | 'put' | 'patch' | 'delete';
   path: string;
   tag: string;
   summary: string;

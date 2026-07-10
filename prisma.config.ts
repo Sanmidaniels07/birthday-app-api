@@ -1,5 +1,5 @@
-import 'dotenv/config';
-import { defineConfig, env } from 'prisma/config';
+import "dotenv/config";
+import { defineConfig, env } from "prisma/config";
 
 /**
  * Prisma 7 CLI configuration.
@@ -8,11 +8,12 @@ import { defineConfig, env } from 'prisma/config';
  * The app itself connects via the pooled DATABASE_URL in src/lib/prisma.ts.
  */
 export default defineConfig({
-  schema: 'prisma/schema.prisma',
+  schema: "prisma/schema.prisma",
   migrations: {
-    path: 'prisma/migrations',
+    path: "prisma/migrations",
+    seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: env('DIRECT_URL'),
+    url: env("DIRECT_URL"),
   },
 });

@@ -1,0 +1,47 @@
+import type { Request, Response } from 'express';
+import * as profilesService from './profiles.service.js';
+import { ok } from '../../utils/response.js';
+
+export async function usernameAvailable(req: Request, res: Response) {
+  const u = req.query.u as string; 
+  const available = await profilesService.isUsernameAvailable(u);
+  ok(res, { username: u, available });
+}
+
+export async function setup(req: Request, res: Response) {
+  const profile = await profilesService.setupProfile(req.user!.sub, req.body);
+  ok(res, profile, undefined, 201);
+}
+
+export async function getByUsername(req: Request, res: Response) {
+  const profile = await profilesService.getProfileByUsername(
+    req.params.username as string,
+    req.user!.sub,
+  );
+  ok(res, profile);
+}
+
+export async function update(req: Request, res: Response) {
+  const profile = await profilesService.updateProfile(req.user!.sub, req.body);
+  ok(res, profile);
+}
+
+export async function interests(_req: Request, res: Response) {
+  ok(res, await profilesService.listInterests());
+}
+
+export async function myInterests(req: Request, res: Response) {
+  ok(res, await profilesService.listMyInterests(req.user!.sub));
+}
+
+export async function setInterests(req: Request, res: Response) {
+  ok(res, await profilesService.setMyInterests(req.user!.sub, req.body.interestIds));
+}
+
+export async function avatarSignature(req: Request, res: Response) {
+  ok(res, profilesService.getAvatarUploadSignature(req.user!.sub));
+}
+
+export async function confirmAvatar(req: Request, res: Response) {
+  ok(res, await profilesService.confirmAvatar(req.user!.sub, req.body.publicId));
+}

@@ -1,0 +1,66 @@
+import { registerEndpoint } from '../../docs/openapi.js';
+import {
+  setupProfileSchema,
+  updateProfileSchema,
+  usernameQuerySchema,
+  setInterestsSchema,
+  confirmAvatarSchema,
+} from './profiles.schemas.js';
+
+registerEndpoint({
+  method: 'get', path: '/profiles/username-available', tag: 'Profiles',
+  summary: 'Check username availability (query: ?u=)', secured: true,
+  responses: { '200': { description: 'Availability', example: { data: { username: 'daniel_o', available: true } } }, '400': { description: 'Invalid or reserved username' } },
+});
+
+registerEndpoint({
+  method: 'post', path: '/profiles/setup', tag: 'Profiles',
+  summary: 'Complete onboarding: claim username, create profile', secured: true,
+  body: setupProfileSchema,
+  responses: { '201': { description: 'Profile created' }, '409': { description: 'Profile exists / username just taken' } },
+});
+
+registerEndpoint({
+  method: 'patch', path: '/profiles/me', tag: 'Profiles',
+  summary: 'Update profile (null clears a clearable field)', secured: true,
+  body: updateProfileSchema,
+  responses: { '200': { description: 'Updated profile' }, '404': { description: 'No profile yet — setup first' } },
+});
+
+registerEndpoint({
+  method: 'get', path: '/profiles/interests', tag: 'Profiles',
+  summary: 'The interest catalog', secured: true,
+  responses: { '200': { description: 'All interests' } },
+});
+
+registerEndpoint({
+  method: 'get', path: '/profiles/me/interests', tag: 'Profiles',
+  summary: 'My selected interests', secured: true,
+  responses: { '200': { description: 'My interests' } },
+});
+
+registerEndpoint({
+  method: 'put', path: '/profiles/me/interests', tag: 'Profiles',
+  summary: 'Replace my interests (send the complete set, 1–15)', secured: true,
+  body: setInterestsSchema,
+  responses: { '200': { description: 'The new set' }, '400': { description: 'Unknown interest id' } },
+});
+
+registerEndpoint({
+  method: 'post', path: '/profiles/me/avatar/sign', tag: 'Profiles',
+  summary: 'Get a signed direct-upload grant for my avatar', secured: true,
+  responses: { '200': { description: 'Upload parameters + signature' }, '429': { description: 'Rate limited' } },
+});
+
+registerEndpoint({
+  method: 'post', path: '/profiles/me/avatar/confirm', tag: 'Profiles',
+  summary: 'Confirm the uploaded avatar public id', secured: true,
+  body: confirmAvatarSchema,
+  responses: { '200': { description: 'Avatar saved' }, '400': { description: 'Unexpected avatar reference' } },
+});
+
+registerEndpoint({
+  method: 'get', path: '/profiles/{username}', tag: 'Profiles',
+  summary: 'View a profile (privacy-gated per viewer)', secured: true,
+  responses: { '200': { description: 'The visible fields for this viewer' }, '404': { description: 'Not found or private' } },
+});
