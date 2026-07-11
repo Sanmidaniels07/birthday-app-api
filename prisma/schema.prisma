@@ -93,6 +93,9 @@ model User {
   followers           Follow[]     @relation("Followee")
   blocksInitiated     Block[]      @relation("Blocker")
   blocksReceived      Block[]      @relation("Blocked")
+  posts     Post[]
+  comments  Comment[]
+  reactions Reaction[]
 
   @@index([birthMonth, birthDay])
   @@index([ageBracket])
@@ -255,4 +258,81 @@ model Block {
   @@id([blockerId, blockedId])
   @@index([blockedId])
   @@map("blocks")
+}
+
+model Post {
+  id       String @id @default(cuid())
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  body           String? @db.VarChar(2000)
+  isBirthdayPost Boolean @default(false)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  media     PostMedia[]
+  comments  Comment[]
+  reactions Reaction[]
+
+  @@index([authorId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("posts")
+}
+
+model PostMedia {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  url    String
+  type   String
+  width  Int?
+  height Int?
+  order  Int    @default(0)
+
+  @@index([postId])
+  @@map("post_media")
+}
+
+model Comment {
+  id       String @id @default(cuid())
+  postId   String
+  authorId String
+  post     Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  body     String    @db.VarChar(1000)
+  parentId String?
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[] @relation("CommentReplies")
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  reactions Reaction[]
+
+  @@index([postId, createdAt])
+  @@map("comments")
+}
+
+model Reaction {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emoji     String
+  postId    String?
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId, emoji])
+  @@unique([userId, commentId, emoji])
+  @@index([postId])
+  @@index([commentId])
+  @@map("reactions")
 }

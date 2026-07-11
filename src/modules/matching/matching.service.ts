@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma.js';
 import { NotFoundError } from '../../utils/errors.js';
+import { blockedIdsFor } from '../social/social.helpers.js';
 
 const CANDIDATE_CAP = 120; 
 
@@ -22,17 +23,12 @@ export async function discoverMatches(userId: string, limit: number): Promise<Sc
       interests: { select: { interestId: true } },
     },
   });
-  if (!me?.profile === undefined) throw new NotFoundError('User');
   if (!me) throw new NotFoundError('User');
 
   const myInterestIds = me.interests.map((i) => i.interestId);
 
   // Users with a block in either direction never enter the pool.
-  const blocks = await prisma.block.findMany({
-    where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
-    select: { blockerId: true, blockedId: true },
-  });
-  const excludedIds = blocks.map((b) => (b.blockerId === userId ? b.blockedId : b.blockerId));
+  const excludedIds = await blockedIdsFor(userId);
 
   // Visibility doctrine, applied at generation: PRIVATE and profile-less
   // users never enter the candidate pool at all.

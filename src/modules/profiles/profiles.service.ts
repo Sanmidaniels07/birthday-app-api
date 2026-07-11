@@ -3,7 +3,7 @@ import { BadRequestError, ConflictError, NotFoundError } from '../../utils/error
 import type { SetupProfileInput } from './profiles.schemas.js';
 import type { UpdateProfileInput } from './profiles.schemas.js';
 import { cloudinaryEnabled, signAvatarUpload, MEDIA_ROOT } from '../../lib/cloudinary.js';
-import { blockExistsBetween, areFriends, } from '../social/social.helpers.js';
+import { blockExistsBetween, areFriends, blockedIdsFor, } from '../social/social.helpers.js';
 
 
 
@@ -219,4 +219,28 @@ export async function confirmAvatar(userId: string, publicId: string) {
     select: { username: true, avatarUrl: true },
   });
   return profile;
+}
+
+
+export async function searchProfiles(viewerId: string, q: string, limit: number) {
+  const blockedIds = await blockedIdsFor(viewerId);
+
+  const rows = await prisma.profile.findMany({
+    where: {
+      userId: { notIn: [viewerId, ...blockedIds] },
+      visibility: { not: 'PRIVATE' },
+      user: { status: 'ACTIVE', emailVerifiedAt: { not: null } },
+      OR: [
+        { username: { contains: q.toLowerCase() } },
+        { displayName: { contains: q, mode: 'insensitive' } },
+      ],
+    },
+    orderBy: [
+      { username: 'asc' }, // deterministic; relevance ranking is a hardening-era upgrade
+    ],
+    take: limit,
+    select: { username: true, displayName: true, avatarUrl: true, blobTint: true, bio: true },
+  });
+
+  return rows;
 }

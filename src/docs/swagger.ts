@@ -6,6 +6,7 @@ import '../modules/profiles/profiles.docs.js';
 import '../modules/communities/communities.docs.js';
 import '../modules/matching/matching.docs.js'
 import '../modules/social/social.docs.js';
+import '../modules/feed/feed.docs.js';
 
 export const openApiSpec = {
   openapi: '3.1.0',
@@ -24,7 +25,7 @@ export const openApiSpec = {
     { name: 'Communities', description: 'Birthday communities: browse, join, the auto-join toggle' },   
     { name: 'Matching', description: 'Birthday-based people discovery' },
     { name: 'Social', description: 'Friends, requests, follows, blocks' },
-
+    { name: 'Feed', description: 'Posts, reactions, comments' },
   ],
   components: {
     securitySchemes: {

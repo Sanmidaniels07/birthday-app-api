@@ -28,3 +28,12 @@ export async function blockExistsBetween(a: string, b: string): Promise<boolean>
   });
   return row !== null;
 }
+
+/** All user ids connected to `userId` by a block, either direction. */
+export async function blockedIdsFor(userId: string): Promise<string[]> {
+  const blocks = await prisma.block.findMany({
+    where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
+    select: { blockerId: true, blockedId: true },
+  });
+  return blocks.map((b) => (b.blockerId === userId ? b.blockedId : b.blockerId));
+}

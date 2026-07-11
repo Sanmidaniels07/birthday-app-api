@@ -53,3 +53,8 @@ export const setInterestsSchema = z.object({
 export const confirmAvatarSchema = z.object({
   publicId: z.string().min(1).max(200),
 });
+
+export const searchQuerySchema = z.object({
+  q: z.string().trim().min(2, 'Search needs at least 2 characters').max(50),
+  limit: z.coerce.number().int().min(1).max(25).default(10),
+});

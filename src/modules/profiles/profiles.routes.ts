@@ -11,6 +11,8 @@ import { z } from "zod";
 import { setInterestsSchema } from './profiles.schemas.js';
 import { confirmAvatarSchema } from './profiles.schemas.js';
 import { uploadLimiter } from '../../middleware/rate-limit.js';
+import { searchQuerySchema } from './profiles.schemas.js';
+
 
 
 
@@ -55,3 +57,5 @@ profilesRouter.get('/me/interests', requireAuth, controller.myInterests);
 profilesRouter.put('/me/interests', requireAuth, validate({ body: setInterestsSchema }), controller.setInterests);
 
 profilesRouter.post('/me/avatar/sign', requireAuth, uploadLimiter, controller.avatarSignature);
+
+profilesRouter.get('/search', requireAuth, validate({ query: searchQuerySchema }), controller.search);

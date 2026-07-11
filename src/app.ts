@@ -15,6 +15,7 @@ import { profilesRouter } from './modules/profiles/profiles.routes.js';
 import { communitiesRouter } from './modules/communities/communities.routes.js';
 import { matchingRouter } from './modules/matching/matching.routes.js';
 import { socialRouter } from './modules/social/social.routes.js';
+import { feedRouter } from './modules/feed/feed.routes.js';
 
 export function createApp() {
   const app = express();
@@ -46,6 +47,7 @@ export function createApp() {
   v1.use('/communities', communitiesRouter);
   v1.use('/matching', matchingRouter);
   v1.use('/social', socialRouter);
+  v1.use('/feed', feedRouter);
   app.use('/api/v1', v1);
 
   // ---- Terminal handlers (must be LAST) ----

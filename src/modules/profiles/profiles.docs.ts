@@ -77,3 +77,12 @@ registerEndpoint({
     '404': { description: 'Not found, private, friends-only (non-friend), or blocked' },
   },
 });
+
+registerEndpoint({
+  method: 'get', path: '/profiles/search', tag: 'Profiles',
+  summary: 'Search users by username or display name (?q=, min 2 chars)', secured: true,
+  responses: {
+    '200': { description: 'Profile cards (private and blocked users excluded)' },
+    '400': { description: 'Query too short' },
+  },
+});

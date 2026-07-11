@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { env } from '../config/env.js';
+import { randomUUID } from 'node:crypto';
 
 export const cloudinaryEnabled = Boolean(
   env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET,
@@ -28,6 +29,25 @@ export function signAvatarUpload(userId: string) {
 
   const signature = cloudinary.utils.api_sign_request(params, env.CLOUDINARY_API_SECRET!);
 
+  return {
+    ...params,
+    signature,
+    apiKey: env.CLOUDINARY_API_KEY!,
+    cloudName: env.CLOUDINARY_CLOUD_NAME!,
+    uploadUrl: `https://api.cloudinary.com/v1_1/${env.CLOUDINARY_CLOUD_NAME}/image/upload`,
+  };
+}
+
+
+export function signPostMediaUpload(userId: string) {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params = {
+    timestamp,
+    folder: `${MEDIA_ROOT}/posts/${userId}`,
+    public_id: `post_${randomUUID()}`,
+    transformation: 'c_limit,w_1600,h_1600,q_auto,f_auto', 
+  };
+  const signature = cloudinary.utils.api_sign_request(params, env.CLOUDINARY_API_SECRET!);
   return {
     ...params,
     signature,

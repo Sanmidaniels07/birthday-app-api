@@ -45,3 +45,8 @@ export async function avatarSignature(req: Request, res: Response) {
 export async function confirmAvatar(req: Request, res: Response) {
   ok(res, await profilesService.confirmAvatar(req.user!.sub, req.body.publicId));
 }
+
+export async function search(req: Request, res: Response) {
+  const { q, limit } = req.query as { q: string; limit?: string };
+  ok(res, await profilesService.searchProfiles(req.user!.sub, q, Number(limit ?? 10)));
+}

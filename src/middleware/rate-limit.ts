@@ -46,3 +46,17 @@ export const socialWriteLimiter = rateLimit({
   limit: 30,
   ...shared,
 });
+
+/** Post creation — the content-spam vector. */
+export const postLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 15,
+  ...shared,
+});
+
+/** Comments/reactions are lighter but still floodable. */
+export const interactionLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 60,
+  ...shared,
+});
