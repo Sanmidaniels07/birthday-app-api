@@ -106,6 +106,23 @@ export function initSockets(server: HttpServer): Server {
       });
     });
 
+    // ---- Call signaling: opaque relay, membership-gated per blob ----
+    socket.on(SocketEvents.CLIENT_CALL_SIGNAL, async (payload: { callId?: string; data?: unknown }) => {
+      const { callId, data } = payload ?? {};
+      if (!callId || data === undefined) return;
+      const { canSignal } = await import('../modules/calls/calls.service.js');
+      const gate = await canSignal(userId, callId);
+      if (!gate.ok) return; // not your call, or call over → silence, not errors
+      // Relay to the OTHER participant(s): everyone in the conversation
+      // room except the sender. We never parse `data` — SDP and ICE are
+      // the peers' business.
+      socket.to(`conversation:${gate.conversationId}`).emit(SocketEvents.CALL_SIGNAL, {
+        callId,
+        from: userId,
+        data,
+      });
+    });
+
     // ---- Presence out ----
     socket.on('disconnect', async () => {
       const sockets = presence.get(userId);

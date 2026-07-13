@@ -17,6 +17,7 @@ import { matchingRouter } from "./modules/matching/matching.routes.js";
 import { socialRouter } from "./modules/social/social.routes.js";
 import { feedRouter } from "./modules/feed/feed.routes.js";
 import { chatRouter } from "./modules/chat/chat.routes.js";
+import { callsRouter } from "./modules/calls/calls.routes.js";
 
 export function createApp() {
   const app = express();
@@ -52,6 +53,7 @@ export function createApp() {
   v1.use("/social", socialRouter);
   v1.use("/feed", feedRouter);
   v1.use("/chat", chatRouter);
+  v1.use('/calls', callsRouter);
   app.use("/api/v1", v1);
 
   // ---- Terminal handlers (must be LAST) ----

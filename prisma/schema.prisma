@@ -70,6 +70,20 @@ enum MessageType {
   SYSTEM     
 }
 
+enum CallType {
+  VOICE
+  VIDEO
+}
+
+enum CallStatus {
+  RINGING
+  ONGOING
+  ENDED
+  MISSED
+  DECLINED
+  FAILED
+}
+
 model User {
   id           String       @id @default(cuid())
   fullName     String
@@ -114,6 +128,8 @@ model User {
   conversationsCreated Conversation[]            @relation("ConversationCreator")
   participations       ConversationParticipant[]
   messages             Message[]
+  callsInitiated     Call[]            @relation("CallInitiator")
+  callParticipations CallParticipant[]
 
   @@index([birthMonth, birthDay])
   @@index([ageBracket])
@@ -372,6 +388,7 @@ model Conversation {
 
   participants ConversationParticipant[]
   messages     Message[]
+  calls        Call[]
 
   @@index([lastMessageAt(sort: Desc)])
   @@map("conversations")
@@ -419,4 +436,38 @@ model Message {
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@map("messages")
+}
+
+model Call {
+  id             String       @id @default(cuid())
+  conversationId String
+  initiatorId    String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  initiator      User         @relation("CallInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
+
+  type   CallType
+  status CallStatus @default(RINGING)
+
+  startedAt  DateTime  @default(now())
+  answeredAt DateTime?
+  endedAt    DateTime?
+
+  participants CallParticipant[]
+
+  @@index([conversationId, startedAt(sort: Desc)]) 
+  @@map("calls")
+}
+
+model CallParticipant {
+  id     String @id @default(cuid())
+  callId String
+  userId String
+  call   Call   @relation(fields: [callId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  @@unique([callId, userId])
+  @@map("call_participants")
 }

@@ -7,6 +7,8 @@ import '../modules/communities/communities.docs.js';
 import '../modules/matching/matching.docs.js'
 import '../modules/social/social.docs.js';
 import '../modules/feed/feed.docs.js';
+import '../modules/chat/chat.docs.js'; 
+import '../modules/calls/calls.docs.js';
 
 export const openApiSpec = {
   openapi: '3.1.0',
@@ -27,6 +29,7 @@ export const openApiSpec = {
     { name: 'Social', description: 'Friends, requests, follows, blocks' },
     { name: 'Feed', description: 'Posts, reactions, comments' },
     { name: 'Chat', description: 'Conversations, messages, typing, receipts' },
+    { name: 'Calls', description: 'Voice/video call lifecycle, history, ICE servers' },
 
   ],
   components: {
