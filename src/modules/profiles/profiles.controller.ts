@@ -50,3 +50,6 @@ export async function search(req: Request, res: Response) {
   const { q, limit } = req.query as { q: string; limit?: string };
   ok(res, await profilesService.searchProfiles(req.user!.sub, q, Number(limit ?? 10)));
 }
+export async function presence(req: Request, res: Response) {
+  ok(res, await profilesService.getPresence(req.user!.sub, req.params.username as string));
+}

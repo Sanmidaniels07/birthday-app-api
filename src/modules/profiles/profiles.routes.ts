@@ -59,3 +59,5 @@ profilesRouter.put('/me/interests', requireAuth, validate({ body: setInterestsSc
 profilesRouter.post('/me/avatar/sign', requireAuth, uploadLimiter, controller.avatarSignature);
 
 profilesRouter.get('/search', requireAuth, validate({ query: searchQuerySchema }), controller.search);
+
+profilesRouter.get('/:username/presence', requireAuth, validate({ params: z.object({ username }) }), controller.presence);

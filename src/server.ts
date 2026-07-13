@@ -2,10 +2,14 @@ import { createServer } from 'node:http';
 import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { createApp } from './app.js';
+import { initSockets } from './sockets/index.js';
+
 
 const app = createApp();
 
 const server = createServer(app);
+
+initSockets(server);
 
 server.listen(env.PORT, () => {
   logger.info(`🎂 bday-api listening on :${env.PORT} (${env.NODE_ENV})`);

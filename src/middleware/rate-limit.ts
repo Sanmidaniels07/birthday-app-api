@@ -60,3 +60,10 @@ export const interactionLimiter = rateLimit({
   limit: 60,
   ...shared,
 });
+
+/** Message sending — high legitimate volume, but not unbounded. */
+export const messageLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 60, // one per second sustained — humans never hit it
+  ...shared,
+});

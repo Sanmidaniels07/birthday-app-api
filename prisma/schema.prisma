@@ -56,6 +56,20 @@ enum FriendshipStatus {
   DECLINED
 }
 
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO     
+  VOICE_NOTE 
+  SYSTEM     
+}
+
 model User {
   id           String       @id @default(cuid())
   fullName     String
@@ -96,6 +110,10 @@ model User {
   posts     Post[]
   comments  Comment[]
   reactions Reaction[]
+
+  conversationsCreated Conversation[]            @relation("ConversationCreator")
+  participations       ConversationParticipant[]
+  messages             Message[]
 
   @@index([birthMonth, birthDay])
   @@index([ageBracket])
@@ -335,4 +353,70 @@ model Reaction {
   @@index([postId])
   @@index([commentId])
   @@map("reactions")
+}
+
+model Conversation {
+  id        String           @id @default(cuid())
+  type      ConversationType
+  creatorId String?
+  creator   User?            @relation("ConversationCreator", fields: [creatorId], references: [id], onDelete: SetNull)
+
+  title     String?
+  avatarUrl String?
+
+  pairKey String? @unique
+
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([lastMessageAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isAdmin    Boolean   @default(false)
+  joinedAt   DateTime  @default(now())
+  leftAt     DateTime?
+  lastReadAt DateTime?
+  mutedUntil DateTime?
+
+  @@unique([conversationId, userId])
+  @@index([userId, leftAt])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  type MessageType @default(TEXT)
+  body String?     @db.VarChar(4000)
+
+  mediaUrl      String?
+  mediaDuration Int?
+  mediaSize     Int?
+
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReplies")
+
+  editedAt  DateTime?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@map("messages")
 }

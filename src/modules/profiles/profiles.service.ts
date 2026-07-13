@@ -4,6 +4,7 @@ import type { SetupProfileInput } from './profiles.schemas.js';
 import type { UpdateProfileInput } from './profiles.schemas.js';
 import { cloudinaryEnabled, signAvatarUpload, MEDIA_ROOT } from '../../lib/cloudinary.js';
 import { blockExistsBetween, areFriends, blockedIdsFor, } from '../social/social.helpers.js';
+import { isOnline } from '../../sockets/index.js';
 
 
 
@@ -243,4 +244,22 @@ export async function searchProfiles(viewerId: string, q: string, limit: number)
   });
 
   return rows;
+}
+
+
+export async function getPresence(viewerId: string, username: string) {
+  // Reuse the profile gate: can't see the profile → can't see presence.
+  await getProfileByUsername(username, viewerId);
+
+  const profile = await prisma.profile.findUnique({
+    where: { username },
+    select: { userId: true, showOnlineStatus: true, user: { select: { lastSeenAt: true } } },
+  });
+  if (!profile) throw new NotFoundError('Profile'); // unreachable post-gate
+
+  if (!profile.showOnlineStatus) {
+    return { online: null, lastSeenAt: null };
+  }
+  const online = isOnline(profile.userId);
+  return { online, lastSeenAt: online ? null : profile.user.lastSeenAt };
 }

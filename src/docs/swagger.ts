@@ -26,6 +26,8 @@ export const openApiSpec = {
     { name: 'Matching', description: 'Birthday-based people discovery' },
     { name: 'Social', description: 'Friends, requests, follows, blocks' },
     { name: 'Feed', description: 'Posts, reactions, comments' },
+    { name: 'Chat', description: 'Conversations, messages, typing, receipts' },
+
   ],
   components: {
     securitySchemes: {

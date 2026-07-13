@@ -86,3 +86,12 @@ registerEndpoint({
     '400': { description: 'Query too short' },
   },
 });
+
+registerEndpoint({
+  method: 'get', path: '/profiles/{username}/presence', tag: 'Profiles',
+  summary: 'Online status (null = user hides it; lastSeenAt only when offline)', secured: true,
+  responses: {
+    '200': { description: 'Presence', example: { data: { online: false, lastSeenAt: '2026-07-10T13:00:00Z' } } },
+    '404': { description: 'Not found, private, friends-only, or blocked' },
+  },
+});
