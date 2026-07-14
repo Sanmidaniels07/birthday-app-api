@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma.js';
 import { BadRequestError, ConflictError, NotFoundError } from '../../utils/errors.js';
 import { areFriends, blockExistsBetween } from './social.helpers.js';
+import { dispatch } from '../notifications/notifications.service.js';
 
 const friendCardSelect = {
   profile: { select: { username: true, displayName: true, avatarUrl: true, blobTint: true } },
@@ -19,6 +20,22 @@ async function resolveTarget(username: string): Promise<string> {
     throw new NotFoundError('User');
   }
   return profile.userId;
+}
+
+/** Shared notifier for both send paths. */
+async function notifyRequest(requesterId: string, addresseeId: string, requestId: string) {
+  const requester = await prisma.profile.findUnique({
+    where: { userId: requesterId },
+    select: { displayName: true },
+  });
+  await dispatch({
+    recipientId: addresseeId,
+    actorId: requesterId,
+    type: 'FRIEND_REQUEST',
+    title: `${requester?.displayName ?? 'Someone'} sent you a friend request`,
+    entityType: 'friendRequest',
+    entityId: requestId,
+  });
 }
 
 export async function sendFriendRequest(requesterId: string, targetUsername: string) {
@@ -49,19 +66,21 @@ export async function sendFriendRequest(requesterId: string, targetUsername: str
       throw new ConflictError('Request already pending');
     }
     // DECLINED: re-request is allowed by reviving the row with roles as-now.
-    // The decliner gets no special alert — memory without a pressure loop.
     const revived = await prisma.friendship.update({
       where: { id: existing.id },
       data: { requesterId, addresseeId, status: 'PENDING', respondedAt: null, createdAt: new Date() },
       select: { id: true, status: true },
     });
+    void notifyRequest(requesterId, addresseeId, revived.id);
     return revived;
   }
 
-  return prisma.friendship.create({
+  const created = await prisma.friendship.create({
     data: { requesterId, addresseeId },
     select: { id: true, status: true },
   });
+  void notifyRequest(requesterId, addresseeId, created.id);
+  return created;
 }
 
 /** Load a pending request and verify the actor is the required side. */
@@ -88,6 +107,20 @@ export async function acceptFriendRequest(actorId: string, requestId: string) {
     where: { id: request.id },
     data: { status: 'ACCEPTED', respondedAt: new Date() },
   });
+
+  const accepter = await prisma.profile.findUnique({
+    where: { userId: actorId },
+    select: { displayName: true },
+  });
+  void dispatch({
+    recipientId: request.requesterId,
+    actorId,
+    type: 'FRIEND_ACCEPTED',
+    title: `${accepter?.displayName ?? 'Someone'} accepted your friend request`,
+    entityType: 'user',
+    entityId: actorId,
+  });
+
   return { accepted: true };
 }
 

@@ -33,6 +33,13 @@ const envSchema = z.object({
   // ---- TURN (Metered.ca) — optional; without it calls are STUN-only ----
   METERED_DOMAIN: z.string().optional(),
   METERED_SECRET: z.string().optional(),
+
+  // ---- Web Push (VAPID) — optional; push silently disabled without ----
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().default('mailto:hello@daymate.app'),
+
+  
 });
 
 const parsed = envSchema.safeParse(process.env);

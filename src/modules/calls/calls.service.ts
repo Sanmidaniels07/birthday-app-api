@@ -5,6 +5,7 @@ import { getIO, isOnline } from '../../sockets/index.js';
 import { SocketEvents } from '../../sockets/events.js';
 import { logger } from '../../lib/logger.js';
 import { env } from '../../config/env.js';
+import { dispatch } from '../notifications/notifications.service.js';
 
 
 const RING_TIMEOUT_MS = 45_000;
@@ -36,7 +37,7 @@ const callSelect = {
 async function participantCall(actorId: string, callId: string) {
   const call = await prisma.call.findUnique({
     where: { id: callId },
-    select: { id: true, conversationId: true, initiatorId: true, status: true },
+    select: { id: true, conversationId: true, initiatorId: true, type: true, status: true },
   });
   if (!call) throw new NotFoundError('Call');
   const participant = await prisma.callParticipant.findUnique({
@@ -103,6 +104,25 @@ export async function initiateCall(actorId: string, conversationId: string, type
           callId: call.id,
           status: 'MISSED',
         });
+
+        const callee = await prisma.callParticipant.findFirst({
+          where: { callId: call.id, userId: { not: actorId } },
+          select: { userId: true },
+        });
+        const caller = await prisma.profile.findUnique({
+          where: { userId: actorId },
+          select: { displayName: true },
+        });
+        if (callee) {
+          void dispatch({
+            recipientId: callee.userId,
+            actorId,
+            type: 'MISSED_CALL',
+            title: `Missed ${type === 'VIDEO' ? 'video' : 'voice'} call from ${caller?.displayName ?? 'someone'}`,
+            entityType: 'conversation',
+            entityId: conversationId,
+          });
+        }
       }
     })().catch((err) => logger.error({ err, callId: call.id }, 'ring timeout handling failed'));
   }, RING_TIMEOUT_MS).unref();
@@ -165,6 +185,28 @@ export async function endCall(actorId: string, callId: string) {
     callId,
     status: finalStatus,
   });
+
+  if (finalStatus === 'MISSED') {
+    const callee = await prisma.callParticipant.findFirst({
+      where: { callId: call.id, userId: { not: call.initiatorId } },
+      select: { userId: true },
+    });
+    const caller = await prisma.profile.findUnique({
+      where: { userId: call.initiatorId },
+      select: { displayName: true },
+    });
+    if (callee) {
+      void dispatch({
+        recipientId: callee.userId,
+        actorId: call.initiatorId,
+        type: 'MISSED_CALL',
+        title: `Missed ${call.type === 'VIDEO' ? 'video' : 'voice'} call from ${caller?.displayName ?? 'someone'}`,
+        entityType: 'conversation',
+        entityId: call.conversationId,
+      });
+    }
+  }
+
   return { ended: true, status: finalStatus };
 }
 

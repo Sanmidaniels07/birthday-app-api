@@ -84,6 +84,19 @@ enum CallStatus {
   FAILED
 }
 
+enum NotificationType {
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  NEW_MESSAGE
+  MISSED_CALL
+  UPCOMING_BIRTHDAY
+  BIRTHDAY_TODAY
+  POST_REACTION
+  POST_COMMENT
+  COMMUNITY_JOINED
+  ANNOUNCEMENT
+}
+
 model User {
   id           String       @id @default(cuid())
   fullName     String
@@ -130,6 +143,11 @@ model User {
   messages             Message[]
   callsInitiated     Call[]            @relation("CallInitiator")
   callParticipations CallParticipant[]
+
+  notifications       Notification[]         @relation("NotificationRecipient")
+  notificationsCaused Notification[]         @relation("NotificationActor")
+  notificationPrefs   NotificationPreference?
+  pushSubscriptions   PushSubscription[]
 
   @@index([birthMonth, birthDay])
   @@index([ageBracket])
@@ -470,4 +488,54 @@ model CallParticipant {
 
   @@unique([callId, userId])
   @@map("call_participants")
+}
+
+model Notification {
+  id          String  @id @default(cuid())
+  recipientId String
+  actorId     String? // who caused it; null for system announcements
+  recipient   User    @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor       User?   @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  type  NotificationType
+  title String
+  body  String?
+
+  entityType String?
+  entityId   String?
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([recipientId, readAt, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailBirthdayDigest Boolean @default(true)
+  emailFriendRequests Boolean @default(true)
+  pushMessages        Boolean @default(true)
+  pushCalls           Boolean @default(true)
+  pushBirthdays       Boolean @default(true)
+  pushSocial          Boolean @default(true)
+
+  @@map("notification_preferences")
+}
+
+model PushSubscription {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String  @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }

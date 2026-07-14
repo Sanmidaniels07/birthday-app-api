@@ -4,6 +4,7 @@ import { cloudinaryEnabled, signPostMediaUpload, MEDIA_ROOT } from '../../lib/cl
 import type { CreatePostInput } from './feed.schemas.js';
 import { livePost, blockedIdsFor, feedAuthorIdsFor } from './feed.visibility.js';
 import { blockExistsBetween } from '../social/social.helpers.js';
+import { dispatch } from '../notifications/notifications.service.js';
 
 /** Is it this user's birthday today (UTC)? */
 function isBirthdayTodayUTC(user: { birthMonth: number; birthDay: number }): boolean {
@@ -181,7 +182,7 @@ async function interactablePost(actorId: string, postId: string) {
 
 export async function togglePostReaction(actorId: string, postId: string, emoji: string) {
   if (!ALLOWED_EMOJI.has(emoji)) throw new BadRequestError('Unsupported reaction');
-  await interactablePost(actorId, postId);
+  const post = await interactablePost(actorId, postId);
 
   const existing = await prisma.reaction.findFirst({
     where: { userId: actorId, postId, emoji },
@@ -190,9 +191,25 @@ export async function togglePostReaction(actorId: string, postId: string, emoji:
 
   if (existing) {
     await prisma.reaction.delete({ where: { id: existing.id } });
-    return { emoji, reacted: false };
+    return { emoji, reacted: false }; 
   }
+
   await prisma.reaction.create({ data: { userId: actorId, postId, emoji } });
+
+  // Notify the author (dispatch's self-guard silences own-post reactions).
+  const actor = await prisma.profile.findUnique({
+    where: { userId: actorId },
+    select: { displayName: true },
+  });
+  void dispatch({
+    recipientId: post.authorId,
+    actorId,
+    type: 'POST_REACTION',
+    title: `${actor?.displayName ?? 'Someone'} reacted ${emoji} to your post`,
+    entityType: 'post',
+    entityId: postId,
+  });
+
   return { emoji, reacted: true };
 }
 
@@ -234,7 +251,7 @@ export async function addComment(
   body: string,
   parentId?: string,
 ) {
-  await interactablePost(actorId, postId);
+  const post = await interactablePost(actorId, postId);
 
   if (parentId) {
     const parent = await prisma.comment.findUnique({
@@ -244,17 +261,31 @@ export async function addComment(
     if (!parent || parent.deletedAt || parent.postId !== postId) {
       throw new NotFoundError('Comment');
     }
-    // The nesting ceiling: replies to replies are refused, keeping
-    // threads exactly two layers deep. Product decision, service-enforced.
     if (parent.parentId !== null) {
       throw new BadRequestError('Replies to replies are not supported — reply to the top-level comment');
     }
   }
 
-  return prisma.comment.create({
+  const comment = await prisma.comment.create({
     data: { postId, authorId: actorId, body, parentId: parentId ?? null },
     select: commentCardSelect,
   });
+
+  const actor = await prisma.profile.findUnique({
+    where: { userId: actorId },
+    select: { displayName: true },
+  });
+  void dispatch({
+    recipientId: post.authorId,
+    actorId,
+    type: 'POST_COMMENT',
+    title: `${actor?.displayName ?? 'Someone'} commented on your post`,
+    body: body.slice(0, 80),
+    entityType: 'post',
+    entityId: postId,
+  });
+
+  return comment;
 }
 
 export async function deleteComment(actorId: string, commentId: string) {

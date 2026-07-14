@@ -9,6 +9,7 @@ import '../modules/social/social.docs.js';
 import '../modules/feed/feed.docs.js';
 import '../modules/chat/chat.docs.js'; 
 import '../modules/calls/calls.docs.js';
+import '../modules/notifications/notifications.docs.js';
 
 export const openApiSpec = {
   openapi: '3.1.0',
@@ -30,6 +31,7 @@ export const openApiSpec = {
     { name: 'Feed', description: 'Posts, reactions, comments' },
     { name: 'Chat', description: 'Conversations, messages, typing, receipts' },
     { name: 'Calls', description: 'Voice/video call lifecycle, history, ICE servers' },
+    { name: 'Notifications', description: 'Inbox, unread counts, preferences, web push' },
 
   ],
   components: {

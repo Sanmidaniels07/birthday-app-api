@@ -25,6 +25,8 @@
   // ---- Client → server: call requests ----
   CLIENT_CALL_SIGNAL: 'client:call:signal',   // { callId, data }
 
+  NOTIFICATION_NEW: 'notification:new',
+
 } as const;
 
 export type SocketEventName = (typeof SocketEvents)[keyof typeof SocketEvents];
