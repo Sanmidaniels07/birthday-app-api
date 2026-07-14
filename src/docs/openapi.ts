@@ -7,6 +7,7 @@ interface EndpointDoc {
   tag: string;
   summary: string;
   body?: ZodType;
+  query?: ZodType;
   secured?: boolean; 
   responses: Record<string, { description: string; example?: unknown }>;
 }
@@ -35,6 +36,19 @@ export function buildPaths(): Record<string, unknown> {
             },
           }
         : {}),
+      ...(e.query
+        ? {
+            parameters: Object.entries(
+              (z.toJSONSchema(e.query) as { properties?: Record<string, unknown>; required?: string[] })
+                .properties ?? {},
+            ).map(([name, schema]) => ({
+              name,
+              in: 'query',
+              required: ((z.toJSONSchema(e.query!) as { required?: string[] }).required ?? []).includes(name),
+              schema,
+            })),
+          }
+        : {}),
       responses: Object.fromEntries(
         Object.entries(e.responses).map(([status, r]) => [
           status,
@@ -51,5 +65,3 @@ export function buildPaths(): Record<string, unknown> {
 
   return paths;
 }
-
-  

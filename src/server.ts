@@ -3,9 +3,14 @@ import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
 import { createApp } from './app.js';
 import { initSockets } from './sockets/index.js';
+import { assertWiring } from './config/assert-wiring.js';
+import { announceConfig } from './config/announce.js';
 
 
 const app = createApp();
+
+assertWiring()
+announceConfig();
 
 const server = createServer(app);
 

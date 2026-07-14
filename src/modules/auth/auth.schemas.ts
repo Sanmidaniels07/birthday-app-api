@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
 
-const email = z.string().email('Enter a valid email address').toLowerCase().trim();
-
+const email = z.string().trim().toLowerCase().email('Enter a valid email address');
 const password = z
   .string()
   .min(10, 'Password must be at least 10 characters')

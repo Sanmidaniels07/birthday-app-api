@@ -2,10 +2,9 @@ import jwt from 'jsonwebtoken';
 import { env } from '../../config/env.js';
 import { UnauthorizedError } from '../../utils/errors.js';
 import type { Response } from 'express';
-import { isProd } from '../../config/env.js';
 
 
-
+const crossSite = env.NODE_ENV !== 'development'; // staging + prod serve a Vercel frontend cross-site
 
 export interface AccessTokenPayload {
   sub: string; 
@@ -33,10 +32,10 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
 
 export function setRefreshCookie(res: Response, token: string): void {
   res.cookie(REFRESH_COOKIE, token, {
-    httpOnly: true,                       // invisible to document.cookie — the XSS defense
-    secure: isProd,                       // HTTPS-only in prod (localhost is http)
-    sameSite: isProd ? 'none' : 'lax',    // 'none' because Vercel and Render are different sites
-    path: '/api/v1/auth',                 // only auth routes ever receive it
+    httpOnly: true,
+    secure: crossSite,                      // HTTPS-only wherever cross-site applies
+    sameSite: crossSite ? 'none' : 'lax',   // 'none' REQUIRES secure — the pairing browsers enforce
+    path: '/api/v1/auth',
     maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
   });
 }

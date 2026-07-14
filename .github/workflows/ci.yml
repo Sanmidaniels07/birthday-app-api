@@ -8,6 +8,18 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -18,10 +30,28 @@ jobs:
 
       - run: npm ci
 
+      - run: npm audit --omit=dev --audit-level=high
+        name: Audit runtime dependencies
+
       - run: npx prisma generate
         name: Generate Prisma client
         env:
-          DIRECT_URL: "postgresql://ci:ci@localhost:5432/ci"
+          DIRECT_URL: "postgresql://postgres:ci@localhost:5432/ci"
 
       - run: npm run typecheck
         name: Typecheck
+
+      - run: npx prisma migrate deploy
+        name: Migrate the throwaway database
+        env:
+          DIRECT_URL: "postgresql://postgres:ci@localhost:5432/ci"
+
+      - run: npm test
+        name: Tests
+        env:
+          NODE_ENV: test
+          DATABASE_URL: "postgresql://postgres:ci@localhost:5432/ci"
+          DIRECT_URL: "postgresql://postgres:ci@localhost:5432/ci"
+          JWT_ACCESS_SECRET: "ci-only-secret-at-least-32-characters-long!"
+          JWT_REFRESH_SECRET: "ci-only-other-secret-32-characters-long!!"
+          WEB_ORIGIN: "http://localhost:3000"
