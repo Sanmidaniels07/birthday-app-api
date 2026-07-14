@@ -18,6 +18,8 @@ import { socialRouter } from "./modules/social/social.routes.js";
 import { feedRouter } from "./modules/feed/feed.routes.js";
 import { chatRouter } from "./modules/chat/chat.routes.js";
 import { callsRouter } from "./modules/calls/calls.routes.js";
+import { adminRouter } from "./modules/admin/admin.routes.js";
+import { reportsRouter } from "./modules/reports/reports.routes.js";
 
 export function createApp() {
   const app = express();
@@ -54,6 +56,8 @@ export function createApp() {
   v1.use("/feed", feedRouter);
   v1.use("/chat", chatRouter);
   v1.use('/calls', callsRouter);
+   v1.use('/reports', reportsRouter);
+  v1.use('/admin', adminRouter)
   app.use("/api/v1", v1);
 
   // ---- Terminal handlers (must be LAST) ----

@@ -97,6 +97,20 @@ enum NotificationType {
   ANNOUNCEMENT
 }
 
+enum ReportStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportTargetType {
+  USER
+  POST
+  MESSAGE
+  COMMENT
+}
+
 model User {
   id           String       @id @default(cuid())
   fullName     String
@@ -148,6 +162,9 @@ model User {
   notificationsCaused Notification[]         @relation("NotificationActor")
   notificationPrefs   NotificationPreference?
   pushSubscriptions   PushSubscription[]
+
+  reportsFiled   Report[] @relation("Reporter")
+  reportsAgainst Report[] @relation("ReportedUser")
 
   @@index([birthMonth, birthDay])
   @@index([ageBracket])
@@ -538,4 +555,31 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+model Report {
+  id         String @id @default(cuid())
+  reporterId String
+  reporter   User   @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  targetType ReportTargetType
+  targetId   String 
+
+  
+  reportedUserId String?
+  reportedUser   User?   @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: SetNull)
+
+  reason  String
+  details String? @db.VarChar(1000)
+  status  ReportStatus @default(OPEN)
+
+  resolvedById String?
+  resolvedAt   DateTime?
+  resolution   String? 
+
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([reportedUserId])
+  @@map("reports")
 }
