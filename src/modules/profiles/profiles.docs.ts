@@ -95,3 +95,9 @@ registerEndpoint({
     '404': { description: 'Not found, private, friends-only, or blocked' },
   },
 });
+
+registerEndpoint({
+  method: 'get', path: '/profiles/me', tag: 'Profiles',
+  summary: 'My own full profile (all private fields)', secured: true,
+  responses: { '200': { description: 'My profile' }, '404': { description: 'No profile yet' } },
+});

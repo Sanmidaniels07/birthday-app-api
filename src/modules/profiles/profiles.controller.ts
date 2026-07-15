@@ -53,3 +53,7 @@ export async function search(req: Request, res: Response) {
 export async function presence(req: Request, res: Response) {
   ok(res, await profilesService.getPresence(req.user!.sub, req.params.username as string));
 }
+
+export async function myProfile(req: Request, res: Response) {
+  ok(res, await profilesService.getMyProfile(req.user!.sub));
+}

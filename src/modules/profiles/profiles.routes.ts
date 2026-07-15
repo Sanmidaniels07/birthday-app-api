@@ -61,3 +61,5 @@ profilesRouter.post('/me/avatar/sign', requireAuth, uploadLimiter, controller.av
 profilesRouter.get('/search', requireAuth, validate({ query: searchQuerySchema }), controller.search);
 
 profilesRouter.get('/:username/presence', requireAuth, validate({ params: z.object({ username }) }), controller.presence);
+
+profilesRouter.get('/me', requireAuth, controller.myProfile);

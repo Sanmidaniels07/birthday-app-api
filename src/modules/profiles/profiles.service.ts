@@ -263,3 +263,17 @@ export async function getPresence(viewerId: string, username: string) {
   const online = isOnline(profile.userId);
   return { online, lastSeenAt: online ? null : profile.user.lastSeenAt };
 }
+
+
+export async function getMyProfile(userId: string) {
+  const profile = await prisma.profile.findUnique({
+    where: { userId },
+    select: {
+      username: true, displayName: true, bio: true, avatarUrl: true, blobTint: true,
+      visibility: true, showBirthYear: true, showAge: true, showLocation: true,
+      showOnlineStatus: true, city: true, country: true,
+    },
+  });
+  if (!profile) throw new NotFoundError('Profile');
+  return profile;
+}
