@@ -50,7 +50,7 @@ function dispatchVerificationEmail(email: string, fullName: string, otp: string)
   );
 }
 
-export async function signup(input: SignupInput): Promise<{ email: string }> {
+export async function signup(input: SignupInput): Promise<{ email: string; otp?: string }> {
   const dob = new Date(`${input.birthDate}T00:00:00Z`);
   const age = ageOn(new Date(), dob);
 
@@ -114,7 +114,7 @@ export async function signup(input: SignupInput): Promise<{ email: string }> {
   dispatchVerificationEmail(input.email, input.fullName, otp);
 
   if (!isProd) logger.debug({ otp }, "OTP (dev convenience log)");
-  return { email: input.email };
+  return { email: input.email, ...(isProd ? {} : { otp }) };
 }
 
 export async function verifyEmail(input: VerifyEmailInput): Promise<{ verified: true }> {

@@ -9,7 +9,11 @@ export async function signup(req: Request, res: Response) {
   const result = await authService.signup(req.body);
   ok(
     res,
-    { email: result.email, message: "We sent a 6-digit verification code to your email." },
+    {
+      email: result.email,
+      message: "We sent a 6-digit verification code to your email.",
+      ...(result.otp ? { otp: result.otp } : {}),
+    },
     undefined,
     202,
   );
