@@ -1,13 +1,24 @@
-import { prisma } from '../../lib/prisma.js';
-import { BadRequestError, ConflictError, NotFoundError } from '../../utils/errors.js';
-import type { SetupProfileInput } from './profiles.schemas.js';
-import type { UpdateProfileInput } from './profiles.schemas.js';
-import { cloudinaryEnabled, signAvatarUpload, MEDIA_ROOT } from '../../lib/cloudinary.js';
-import { blockExistsBetween, areFriends, blockedIdsFor, } from '../social/social.helpers.js';
-import { isOnline } from '../../sockets/index.js';
-
-
-
+import { prisma } from "../../lib/prisma.js";
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from "../../utils/errors.js";
+import type { SetupProfileInput } from "./profiles.schemas.js";
+import type { UpdateProfileInput } from "./profiles.schemas.js";
+import {
+  cloudinaryEnabled,
+  signAvatarUpload,
+  MEDIA_ROOT,
+} from "../../lib/cloudinary.js";
+import {
+  blockExistsBetween,
+  areFriends,
+  blockedIdsFor,
+} from "../social/social.helpers.js";
+import { isOnline } from "../../sockets/index.js";
+import { syncUserCommunities } from "../communities/communities.sync.js";
+import { logger } from "../../lib/logger.js";
 
 export async function isUsernameAvailable(u: string): Promise<boolean> {
   const existing = await prisma.profile.findUnique({
@@ -17,15 +28,23 @@ export async function isUsernameAvailable(u: string): Promise<boolean> {
   return existing === null;
 }
 
-
-
 const MONTH_TINTS = [
-  'powder', 'blush', 'sage', 'lavender', 'butter', 'peach',
-  'butter', 'sage', 'powder', 'lavender', 'blush', 'peach',
+  "powder",
+  "blush",
+  "sage",
+  "lavender",
+  "butter",
+  "peach",
+  "butter",
+  "sage",
+  "powder",
+  "lavender",
+  "blush",
+  "peach",
 ] as const;
 
 export function defaultBlobTint(birthMonth: number): string {
-  return MONTH_TINTS[birthMonth - 1] ?? 'powder';
+  return MONTH_TINTS[birthMonth - 1] ?? "powder";
 }
 
 export async function setupProfile(userId: string, input: SetupProfileInput) {
@@ -33,11 +52,13 @@ export async function setupProfile(userId: string, input: SetupProfileInput) {
     where: { id: userId },
     select: { birthMonth: true, profile: { select: { id: true } } },
   });
-  if (!user) throw new NotFoundError('User');
-  if (user.profile) throw new ConflictError('Profile already set up — use update instead');
+  if (!user) throw new NotFoundError("User");
+  if (user.profile)
+    throw new ConflictError("Profile already set up — use update instead");
 
+  let profile;
   try {
-    return await prisma.profile.create({
+    profile = await prisma.profile.create({
       data: {
         userId,
         username: input.username,
@@ -50,12 +71,22 @@ export async function setupProfile(userId: string, input: SetupProfileInput) {
       select: publicProfileSelect,
     });
   } catch (err: unknown) {
-   
-    if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'P2002') {
-      throw new ConflictError('That username was just taken — try another');
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      err.code === "P2002"
+    ) {
+      throw new ConflictError("That username was just taken — try another");
     }
     throw err;
   }
+
+  void syncUserCommunities(userId).catch((err) =>
+    logger.error({ err, userId }, "community sync on setup failed"),
+  );
+
+  return profile;
 }
 
 const publicProfileSelect = {
@@ -80,7 +111,13 @@ export async function getProfileByUsername(username: string, viewerId: string) {
       city: true,
       country: true,
       user: {
-        select: { birthMonth: true, birthDay: true, birthDate: true, ageBracket: true, lastSeenAt: true },
+        select: {
+          birthMonth: true,
+          birthDay: true,
+          birthDate: true,
+          ageBracket: true,
+          lastSeenAt: true,
+        },
       },
     },
   });
@@ -88,12 +125,16 @@ export async function getProfileByUsername(username: string, viewerId: string) {
   const isOwner = profile?.userId === viewerId;
 
   // Blocked in either direction = does not exist, same as missing/private.
-  if (profile && !isOwner && (await blockExistsBetween(viewerId, profile.userId))) {
-    throw new NotFoundError('Profile');
+  if (
+    profile &&
+    !isOwner &&
+    (await blockExistsBetween(viewerId, profile.userId))
+  ) {
+    throw new NotFoundError("Profile");
   }
 
-  if (!profile || (profile.visibility === 'PRIVATE' && !isOwner)) {
-    throw new NotFoundError('Profile');
+  if (!profile || (profile.visibility === "PRIVATE" && !isOwner)) {
+    throw new NotFoundError("Profile");
   }
 
   // Relationship context — one parallel batch, no waterfalls.
@@ -103,7 +144,7 @@ export async function getProfileByUsername(username: string, viewerId: string) {
         areFriends(viewerId, profile.userId),
         prisma.friendship.findFirst({
           where: {
-            status: 'PENDING',
+            status: "PENDING",
             OR: [
               { requesterId: viewerId, addresseeId: profile.userId },
               { requesterId: profile.userId, addresseeId: viewerId },
@@ -112,14 +153,19 @@ export async function getProfileByUsername(username: string, viewerId: string) {
           select: { id: true, requesterId: true },
         }),
         prisma.follow.findUnique({
-          where: { followerId_followeeId: { followerId: viewerId, followeeId: profile.userId } },
+          where: {
+            followerId_followeeId: {
+              followerId: viewerId,
+              followeeId: profile.userId,
+            },
+          },
           select: { createdAt: true },
         }),
       ]);
 
   // The P3 TODO, honored: FRIENDS_ONLY admits friends.
-  if (profile.visibility === 'FRIENDS_ONLY' && !isOwner && !friends) {
-    throw new NotFoundError('Profile');
+  if (profile.visibility === "FRIENDS_ONLY" && !isOwner && !friends) {
+    throw new NotFoundError("Profile");
   }
 
   return {
@@ -138,7 +184,10 @@ export async function getProfileByUsername(username: string, viewerId: string) {
           pendingRequest: pendingRequest
             ? {
                 requestId: pendingRequest.id,
-                direction: pendingRequest.requesterId === viewerId ? ('outgoing' as const) : ('incoming' as const),
+                direction:
+                  pendingRequest.requesterId === viewerId
+                    ? ("outgoing" as const)
+                    : ("incoming" as const),
               }
             : null,
         },
@@ -147,21 +196,25 @@ export async function getProfileByUsername(username: string, viewerId: string) {
     ...(profile.showBirthYear || isOwner
       ? { birthYear: profile.user.birthDate.getUTCFullYear() }
       : {}),
-    ...(profile.showAge || isOwner ? { ageBracket: profile.user.ageBracket } : {}),
+    ...(profile.showAge || isOwner
+      ? { ageBracket: profile.user.ageBracket }
+      : {}),
     ...(profile.showLocation || isOwner
       ? { city: profile.city, country: profile.country }
       : {}),
   };
 }
 
-
 export async function updateProfile(userId: string, input: UpdateProfileInput) {
-  const profile = await prisma.profile.findUnique({ where: { userId }, select: { id: true } });
-  if (!profile) throw new NotFoundError('Profile'); // setup first, then update
+  const profile = await prisma.profile.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!profile) throw new NotFoundError("Profile"); // setup first, then update
 
   return prisma.profile.update({
     where: { userId },
-    data: input, 
+    data: input,
     select: {
       ...publicProfileSelect,
       showBirthYear: true,
@@ -175,17 +228,25 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
 }
 
 export async function listInterests() {
-  return prisma.interest.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true, slug: true } });
+  return prisma.interest.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, slug: true },
+  });
 }
 
 export async function setMyInterests(userId: string, interestIds: string[]) {
-  const found = await prisma.interest.count({ where: { id: { in: interestIds } } });
-  if (found !== interestIds.length) throw new BadRequestError('One or more interests do not exist');
+  const found = await prisma.interest.count({
+    where: { id: { in: interestIds } },
+  });
+  if (found !== interestIds.length)
+    throw new BadRequestError("One or more interests do not exist");
 
   // Replace-all semantics: the client sends the complete new set.
   await prisma.$transaction([
     prisma.userInterest.deleteMany({ where: { userId } }),
-    prisma.userInterest.createMany({ data: interestIds.map((interestId) => ({ userId, interestId })) }),
+    prisma.userInterest.createMany({
+      data: interestIds.map((interestId) => ({ userId, interestId })),
+    }),
   ]);
 
   return listMyInterests(userId);
@@ -199,19 +260,19 @@ export async function listMyInterests(userId: string) {
   return rows.map((r) => r.interest);
 }
 
-
 export function getAvatarUploadSignature(userId: string) {
   if (!cloudinaryEnabled) {
-    throw new BadRequestError('Media uploads are not configured on this server');
+    throw new BadRequestError(
+      "Media uploads are not configured on this server",
+    );
   }
   return signAvatarUpload(userId);
 }
 
 export async function confirmAvatar(userId: string, publicId: string) {
-
   const expected = `${MEDIA_ROOT}/avatars/user_${userId}`;
   if (publicId !== expected) {
-    throw new BadRequestError('Unexpected avatar reference');
+    throw new BadRequestError("Unexpected avatar reference");
   }
 
   const profile = await prisma.profile.update({
@@ -222,30 +283,38 @@ export async function confirmAvatar(userId: string, publicId: string) {
   return profile;
 }
 
-
-export async function searchProfiles(viewerId: string, q: string, limit: number) {
+export async function searchProfiles(
+  viewerId: string,
+  q: string,
+  limit: number,
+) {
   const blockedIds = await blockedIdsFor(viewerId);
 
   const rows = await prisma.profile.findMany({
     where: {
       userId: { notIn: [viewerId, ...blockedIds] },
-      visibility: { not: 'PRIVATE' },
-      user: { status: 'ACTIVE', emailVerifiedAt: { not: null } },
+      visibility: { not: "PRIVATE" },
+      user: { status: "ACTIVE", emailVerifiedAt: { not: null } },
       OR: [
         { username: { contains: q.toLowerCase() } },
-        { displayName: { contains: q, mode: 'insensitive' } },
+        { displayName: { contains: q, mode: "insensitive" } },
       ],
     },
     orderBy: [
-      { username: 'asc' }, // deterministic; relevance ranking is a hardening-era upgrade
+      { username: "asc" }, // deterministic; relevance ranking is a hardening-era upgrade
     ],
     take: limit,
-    select: { username: true, displayName: true, avatarUrl: true, blobTint: true, bio: true },
+    select: {
+      username: true,
+      displayName: true,
+      avatarUrl: true,
+      blobTint: true,
+      bio: true,
+    },
   });
 
   return rows;
 }
-
 
 export async function getPresence(viewerId: string, username: string) {
   // Reuse the profile gate: can't see the profile → can't see presence.
@@ -253,9 +322,13 @@ export async function getPresence(viewerId: string, username: string) {
 
   const profile = await prisma.profile.findUnique({
     where: { username },
-    select: { userId: true, showOnlineStatus: true, user: { select: { lastSeenAt: true } } },
+    select: {
+      userId: true,
+      showOnlineStatus: true,
+      user: { select: { lastSeenAt: true } },
+    },
   });
-  if (!profile) throw new NotFoundError('Profile'); // unreachable post-gate
+  if (!profile) throw new NotFoundError("Profile"); // unreachable post-gate
 
   if (!profile.showOnlineStatus) {
     return { online: null, lastSeenAt: null };
@@ -264,16 +337,24 @@ export async function getPresence(viewerId: string, username: string) {
   return { online, lastSeenAt: online ? null : profile.user.lastSeenAt };
 }
 
-
 export async function getMyProfile(userId: string) {
   const profile = await prisma.profile.findUnique({
     where: { userId },
     select: {
-      username: true, displayName: true, bio: true, avatarUrl: true, blobTint: true,
-      visibility: true, showBirthYear: true, showAge: true, showLocation: true,
-      showOnlineStatus: true, city: true, country: true,
+      username: true,
+      displayName: true,
+      bio: true,
+      avatarUrl: true,
+      blobTint: true,
+      visibility: true,
+      showBirthYear: true,
+      showAge: true,
+      showLocation: true,
+      showOnlineStatus: true,
+      city: true,
+      country: true,
     },
   });
-  if (!profile) throw new NotFoundError('Profile');
+  if (!profile) throw new NotFoundError("Profile");
   return profile;
 }
