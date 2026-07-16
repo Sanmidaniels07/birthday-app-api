@@ -27,7 +27,17 @@ export const feedQuerySchema = z.object({
 });
 
 export const reactionSchema = z.object({
-  emoji: z.string().min(1).max(8), // membership checked in service — the palette is a product knob
+  emoji: z
+    .string()
+    .trim()
+    .min(1)
+    .refine(
+      (s) => {
+        const segs = [...new Intl.Segmenter().segment(s)];
+        return segs.length === 1 && /\p{Extended_Pictographic}/u.test(s);
+      },
+      { message: 'Must be a single emoji' },
+    ),
 });
 
 export const addCommentSchema = z.object({

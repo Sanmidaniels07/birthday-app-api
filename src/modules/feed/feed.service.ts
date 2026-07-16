@@ -165,8 +165,6 @@ export async function authorFeed(
 
 // ---- Reactions ----
 
-const ALLOWED_EMOJI = new Set(['🎉', '❤️', '👍', '😂', '😮', '🎂']);
-
 /** Load a live post and verify no block stands between actor and author. */
 async function interactablePost(actorId: string, postId: string) {
   const post = await prisma.post.findUnique({
@@ -181,7 +179,9 @@ async function interactablePost(actorId: string, postId: string) {
 }
 
 export async function togglePostReaction(actorId: string, postId: string, emoji: string) {
-  if (!ALLOWED_EMOJI.has(emoji)) throw new BadRequestError('Unsupported reaction');
+  // Shape/abuse validation (single emoji, not arbitrary text) now lives
+  // entirely in reactionSchema — no allow-list gate here anymore, so any
+  // emoji the schema accepts is a valid reaction.
   const post = await interactablePost(actorId, postId);
 
   const existing = await prisma.reaction.findFirst({
