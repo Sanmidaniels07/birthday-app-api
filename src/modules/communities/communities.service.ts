@@ -147,3 +147,8 @@ export async function setAutoJoin(userId: string, enabled: boolean) {
   await syncUserCommunities(userId);
   return { autoJoinBirthdayCommunities: enabled };
 }
+
+export async function resyncMyCommunities(userId: string) {
+  await syncUserCommunities(userId);
+  return { synced: true };
+}

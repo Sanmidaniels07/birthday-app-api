@@ -27,3 +27,7 @@ export async function members(req: Request, res: Response) {
 export async function autoJoin(req: Request, res: Response) {
   ok(res, await service.setAutoJoin(req.user!.sub, req.body.enabled));
 }
+
+export async function resync(req: Request, res: Response) {
+  ok(res, await service.resyncMyCommunities(req.user!.sub));
+}

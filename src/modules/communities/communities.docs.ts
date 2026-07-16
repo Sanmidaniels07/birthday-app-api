@@ -61,3 +61,9 @@ registerEndpoint({
   summary: 'Member list (private profiles excluded, cursor pagination)', secured: true,
   responses: { '200': { description: 'Member profile cards' }, '404': { description: 'No such community' } },
 });
+
+registerEndpoint({
+  method: 'post', path: '/communities/resync', tag: 'Communities',
+  summary: 'Re-run my community auto-join reconciliation', secured: true,
+  responses: { '200': { description: 'Synced' } },
+});

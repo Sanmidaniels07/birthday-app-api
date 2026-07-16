@@ -14,3 +14,4 @@ communitiesRouter.get('/:id', validate({ params: communityIdParam }), controller
 communitiesRouter.post('/:id/join', validate({ params: communityIdParam }), controller.join);
 communitiesRouter.post('/:id/leave', validate({ params: communityIdParam }), controller.leave);
 communitiesRouter.get('/:id/members', validate({ params: communityIdParam, query: membersQuerySchema }), controller.members);
+communitiesRouter.post('/resync', requireAuth, controller.resync);
