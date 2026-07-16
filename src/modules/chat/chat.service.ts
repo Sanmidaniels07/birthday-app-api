@@ -240,6 +240,7 @@ export async function listInbox(
 const messageCardSelect = {
   id: true,
   conversationId: true,
+  senderId: true,
   type: true,
   body: true,
   mediaUrl: true,
