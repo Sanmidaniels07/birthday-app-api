@@ -2,7 +2,10 @@ import { prisma } from '../../lib/prisma.js';
 import { NotFoundError } from '../../utils/errors.js';
 import { blockedIdsFor } from '../social/social.helpers.js';
 
-const CANDIDATE_CAP = 120; 
+const CANDIDATE_CAP = 120;
+
+/** Normalize free-text location for comparison — cities are typed inconsistently. */
+const normLoc = (s: string | null | undefined) => s?.trim().toLowerCase() ?? null;
 
 interface ScoredMatch {
   username: string;
@@ -46,8 +49,8 @@ export async function discoverMatches(userId: string, limit: number): Promise<Sc
     },
   } as const;
 
-  // ---- Candidate generation: four indexed buckets, in parallel ----
-  const [twins, monthMates, bracketMates, interestMates] = await Promise.all([
+  // ---- Candidate generation: five indexed buckets, in parallel ----
+  const [twins, monthMates, bracketMates, interestMates, cityMates] = await Promise.all([
     prisma.user.findMany({
       where: { ...visible, birthMonth: me.birthMonth, birthDay: me.birthDay },
       take: CANDIDATE_CAP, select: candidateSelect,
@@ -68,11 +71,21 @@ export async function discoverMatches(userId: string, limit: number): Promise<Sc
           take: CANDIDATE_CAP, select: candidateSelect,
         })
       : Promise.resolve([]),
+    // Location bucket — surfaces people in your city even without another shared trait.
+    me.profile?.city
+      ? prisma.user.findMany({
+          where: {
+            ...visible,
+            profile: { is: { city: { equals: me.profile.city, mode: 'insensitive' } } },
+          },
+          take: CANDIDATE_CAP, select: candidateSelect,
+        })
+      : Promise.resolve([]),
   ]);
 
   // Union by id
   const pool = new Map<string, (typeof twins)[number]>();
-  for (const c of [...twins, ...monthMates, ...bracketMates, ...interestMates]) {
+  for (const c of [...twins, ...monthMates, ...bracketMates, ...interestMates, ...cityMates]) {
     pool.set(c.id, c);
   }
   if (pool.size === 0) return [];
@@ -88,6 +101,9 @@ export async function discoverMatches(userId: string, limit: number): Promise<Sc
   const overlapByUser = new Map(overlaps.map((o) => [o.userId, o._count.interestId]));
 
   // ---- Scoring ----
+  const myCity = normLoc(me.profile?.city);
+  const myCountry = normLoc(me.profile?.country);
+
   const scored: ScoredMatch[] = [];
   for (const c of pool.values()) {
     if (!c.profile) continue;
@@ -115,10 +131,13 @@ export async function discoverMatches(userId: string, limit: number): Promise<Sc
       reasons.push(shared === 1 ? '1 shared interest' : `${shared} shared interests`);
     }
 
-    if (me.profile?.city && c.profile.city === me.profile.city) {
+    // Location — normalized so casing/whitespace differences don't miss.
+    const candCity = normLoc(c.profile.city);
+    const candCountry = normLoc(c.profile.country);
+    if (myCity && candCity && candCity === myCity) {
       score += 10;
       reasons.push('Same city');
-    } else if (me.profile?.country && c.profile.country === me.profile.country) {
+    } else if (myCountry && candCountry && candCountry === myCountry) {
       score += 5;
       reasons.push('Same country');
     }

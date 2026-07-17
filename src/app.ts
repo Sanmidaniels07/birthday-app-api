@@ -17,13 +17,24 @@ export function createApp() {
   app.set("trust proxy", 1);
 
   // ---- Middleware (order matters) ----
-app.use(
+  app.use(
     helmet({
-      contentSecurityPolicy: false, 
-      crossOriginResourcePolicy: { policy: 'cross-origin' }, 
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" },
     }),
-  );  
-  app.use(cors({ origin: env.WEB_ORIGIN, credentials: true }));
+  );
+  const allowedOrigins = env.WEB_ORIGIN.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  app.use(
+    cors({
+      origin: (origin, cb) => {
+        if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+        else cb(new Error(`CORS: origin ${origin} not allowed`));
+      },
+      credentials: true,
+    }),
+  );
   app.use(compression());
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
