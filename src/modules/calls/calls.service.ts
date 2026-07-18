@@ -74,6 +74,26 @@ export async function initiateCall(actorId: string, conversationId: string, type
   });
   if (liveCall) throw new ConflictError('A call is already in progress in this conversation');
 
+  // Caller busy-check: I can't start a call while I'm already in one (any conversation).
+  const callerBusy = await prisma.call.findFirst({
+    where: {
+      status: { in: ['RINGING', 'ONGOING'] },
+      participants: { some: { userId: actorId, leftAt: null } },
+    },
+    select: { id: true },
+  });
+  if (callerBusy) throw new ConflictError('You are already in a call');
+
+  // Callee busy-check: if they're on another call (any conversation), tell the caller.
+  const calleeBusy = await prisma.call.findFirst({
+    where: {
+      status: { in: ['RINGING', 'ONGOING'] },
+      participants: { some: { userId: calleeId, leftAt: null } },
+    },
+    select: { id: true },
+  });
+  if (calleeBusy) throw new ConflictError('This person is on another call right now');
+
   const call = await prisma.call.create({
     data: {
       conversationId,
