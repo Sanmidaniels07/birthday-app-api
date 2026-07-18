@@ -42,12 +42,21 @@ async function broadcastPresence(userId: string, online: boolean): Promise<void>
 }
 
 export function initSockets(server: HttpServer): Server {
+  const allowedOrigins = env.WEB_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean);
+  if (env.NODE_ENV !== 'production') allowedOrigins.push('http://localhost:3000');
+
   io = new Server(server, {
-    cors: { origin: env.WEB_ORIGIN, credentials: true },
+    cors: {
+      origin: (origin, cb) => {
+        if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+        else cb(new Error('Not allowed by CORS'));
+      },
+      credentials: true,
+    },
     path: '/socket.io',
   });
 
-  // ---- Auth handshake: no valid access token, no socket. ----
+  
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth?.token as string | undefined;
