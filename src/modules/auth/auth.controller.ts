@@ -37,19 +37,26 @@ const sessionMeta = (req: Request) => ({
 
 export async function login(req: Request, res: Response) {
   const result = await authService.login(req.body, sessionMeta(req));
-  setRefreshCookie(res, result.refreshToken, req);   // ← add req
-  ok(res, { accessToken: result.accessToken, user: result.user });
+  setRefreshCookie(res, result.refreshToken, req);
+  ok(res, {
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,   
+    user: result.user,
+  });
 }
 
-
 export async function refresh(req: Request, res: Response) {
-  const token = req.cookies?.[REFRESH_COOKIE];
+  const token = req.cookies?.[REFRESH_COOKIE] ?? req.body?.refreshToken;
   if (!token) return void res.status(401).json({
     error: { code: "UNAUTHORIZED", message: "No session" },
   });
   const result = await authService.refresh(token, sessionMeta(req));
-  setRefreshCookie(res, result.refreshToken, req);   // ← add req
-  ok(res, { accessToken: result.accessToken, user: result.user });
+  setRefreshCookie(res, result.refreshToken, req);
+  ok(res, {
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,   
+    user: result.user,
+  });
 }
 
 export async function logout(req: Request, res: Response) {
