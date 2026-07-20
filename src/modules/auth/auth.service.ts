@@ -165,7 +165,7 @@ export async function verifyEmail(input: VerifyEmailInput): Promise<{ verified: 
   return { verified: true };
 }
 
-export async function resendOtp(email: string): Promise<{ email: string }> {
+export async function resendOtp(email: string): Promise<{ email: string; otp?: string }> {
   const user = await prisma.user.findUnique({ where: { email } });
 
   // Unknown or already-verified: pretend we sent. No enumeration oracle.
@@ -189,9 +189,12 @@ export async function resendOtp(email: string): Promise<{ email: string }> {
   dispatchVerificationEmail(email, user.fullName, otp);
 
   if (!isProd) logger.debug({ otp }, "resent OTP (dev convenience log)");
-  return { email };
-}
 
+  // Dev/staging convenience ONLY: expose the code so testing doesn't need an inbox.
+  // In production the code travels by email alone — returning it would let anyone
+  // verify an address they don't own.
+  return { email, ...(!isProd ? { otp } : {}) };
+}
 
 
 const refreshExpiry = () =>

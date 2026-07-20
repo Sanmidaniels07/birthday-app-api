@@ -26,7 +26,11 @@ export async function verifyEmail(req: Request, res: Response) {
 
 export async function resendOtp(req: Request, res: Response) {
   const result = await authService.resendOtp(req.body.email);
-  ok(res, { email: result.email, message: "If that address needs a code, we sent one." });
+  ok(res, {
+    email: result.email,
+    message: "If that address needs a code, we sent one.",
+    ...(result.otp ? { otp: result.otp } : {}),
+  });
 }
 
 
