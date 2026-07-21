@@ -247,6 +247,7 @@ const messageCardSelect = {
   mediaDuration: true,
   mediaSize: true,
   replyToId: true,
+  replyToStoryId: true,
   editedAt: true,
   deletedAt: true,
   createdAt: true,
