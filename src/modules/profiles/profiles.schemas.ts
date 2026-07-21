@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+export const anniversaryDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD')
+  .refine((s) => {
+    const d = new Date(`${s}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && s === d.toISOString().slice(0, 10);
+  }, 'That date does not exist')
+  .refine((s) => new Date(`${s}T00:00:00Z`) <= new Date(), 'Your anniversary can\'t be in the future');
+
 
 const RESERVED_USERNAMES = new Set([
   'admin', 'administrator', 'root', 'support', 'help', 'mod', 'moderator',
@@ -24,20 +33,23 @@ export const setupProfileSchema = z.object({
   username,
   displayName: z.string().trim().min(2).max(50),
   bio: z.string().trim().max(500).optional(),
-  blobTint: z.enum(BLOB_TINTS).optional(), // omitted → derived from birth month
+  blobTint: z.enum(BLOB_TINTS).optional(),
   city: z.string().trim().max(100).optional(),
   country: z.string().trim().max(100).optional(),
+  anniversaryDate: anniversaryDate.optional(),   
 });
 
 export const updateProfileSchema = z.object({
   displayName: z.string().trim().min(2).max(50).optional(),
-  bio: z.string().trim().max(500).nullable().optional(), // null = "clear my bio"
+  bio: z.string().trim().max(500).nullable().optional(),
   blobTint: z.enum(BLOB_TINTS).optional(),
   city: z.string().trim().max(100).nullable().optional(),
   country: z.string().trim().max(100).nullable().optional(),
+  anniversaryDate: anniversaryDate.nullable().optional(),   
   visibility: z.enum(['PUBLIC', 'FRIENDS_ONLY', 'PRIVATE']).optional(),
   showBirthYear: z.boolean().optional(),
   showAge: z.boolean().optional(),
+  showAnniversary: z.boolean().optional(),   
   showLocation: z.boolean().optional(),
   showOnlineStatus: z.boolean().optional(),
 }).refine((o) => Object.keys(o).length > 0, 'Provide at least one field to update');

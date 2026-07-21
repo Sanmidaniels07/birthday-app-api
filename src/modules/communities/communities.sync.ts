@@ -14,7 +14,7 @@ const MONTH_TINTS = [
 ] as const;
 
 interface CommunitySpec {
-  type: 'BIRTHDAY' | 'BIRTH_MONTH' | 'AGE_BRACKET';
+  type: 'BIRTHDAY' | 'BIRTH_MONTH' | 'AGE_BRACKET' | 'ANNIVERSARY';
   month: number | null;
   day: number | null;
   bracket: string | null;
@@ -24,10 +24,13 @@ interface CommunitySpec {
 }
 
 /** What SHOULD this user's auto-communities be? Pure function — easy to test. */
+/** What SHOULD this user's auto-communities be? Pure function — easy to test. */
 export function targetCommunitySpecs(user: {
   birthMonth: number;
   birthDay: number;
   ageBracket: string | null;
+  anniversaryMonth: number | null;
+  anniversaryDay: number | null;
 }): CommunitySpec[] {
   const monthName = MONTH_NAMES[user.birthMonth - 1] ?? 'January';
   const tint = MONTH_TINTS[user.birthMonth - 1] ?? 'powder';
@@ -65,9 +68,22 @@ export function targetCommunitySpecs(user: {
     });
   }
 
+  // Anniversary club — only for users who have set a wedding anniversary.
+  if (user.anniversaryMonth != null && user.anniversaryDay != null) {
+    const annivMonthName = MONTH_NAMES[user.anniversaryMonth - 1] ?? 'January';
+    specs.push({
+      type: 'ANNIVERSARY',
+      month: user.anniversaryMonth,
+      day: user.anniversaryDay,
+      bracket: null,
+      name: `${annivMonthName} ${user.anniversaryDay} Anniversary Club`,
+      description: `For couples celebrating ${annivMonthName} ${user.anniversaryDay} — your anniversary twins.`,
+      coverTint: 'blush',
+    });
+  }
+
   return specs;
 }
-
 
 async function ensureCommunity(spec: CommunitySpec): Promise<string> {
  
@@ -113,6 +129,8 @@ export async function syncUserCommunities(userId: string): Promise<void> {
       birthMonth: true,
       birthDay: true,
       ageBracket: true,
+      anniversaryMonth: true,   
+      anniversaryDay: true, 
       autoJoinBirthdayCommunities: true,
     },
   });

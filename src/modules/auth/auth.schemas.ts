@@ -1,64 +1,66 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-
-const email = z.string().trim().toLowerCase().email('Enter a valid email address');
+const email = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .email("Enter a valid email address");
 const password = z
   .string()
-  .min(10, 'Password must be at least 10 characters')
-  .max(128, 'Password is too long')
-  .regex(/[a-z]/, 'Password needs a lowercase letter')
-  .regex(/[A-Z]/, 'Password needs an uppercase letter')
-  .regex(/[0-9]/, 'Password needs a number');
+  .min(10, "Password must be at least 10 characters")
+  .max(128, "Password is too long")
+  .regex(/[a-z]/, "Password needs a lowercase letter")
+  .regex(/[A-Z]/, "Password needs an uppercase letter")
+  .regex(/[0-9]/, "Password needs a number");
 
-/**
- * Birth date arrives as "YYYY-MM-DD". We validate it's a real date,
- * not in the future, and the user is at least 13 (and at most 120 —
- * nobody born in 1890 is signing up, that's a typo).
- */
 const birthDate = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use the format YYYY-MM-DD')
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use the format YYYY-MM-DD")
   .refine((s) => {
     const d = new Date(`${s}T00:00:00Z`);
     return !Number.isNaN(d.getTime()) && s === d.toISOString().slice(0, 10);
-  }, 'That date does not exist')
+  }, "That date does not exist")
   .refine((s) => {
     const age = ageOn(new Date(), new Date(`${s}T00:00:00Z`));
     return age >= 13;
-  }, 'You must be at least 13 to join')
+  }, "You must be at least 13 to join")
   .refine((s) => {
     const age = ageOn(new Date(), new Date(`${s}T00:00:00Z`));
     return age <= 120;
-  }, 'Check the year — that would make you over 120');
+  }, "Check the year — that would make you over 120");
 
 export function ageOn(now: Date, dob: Date): number {
   let age = now.getUTCFullYear() - dob.getUTCFullYear();
   const beforeBirthday =
     now.getUTCMonth() < dob.getUTCMonth() ||
-    (now.getUTCMonth() === dob.getUTCMonth() && now.getUTCDate() < dob.getUTCDate());
+    (now.getUTCMonth() === dob.getUTCMonth() &&
+      now.getUTCDate() < dob.getUTCDate());
   if (beforeBirthday) age -= 1;
   return age;
 }
 
-// ---- Request schemas ----
 
 export const signupSchema = z.object({
-  fullName: z.string().trim().min(2, 'Enter your full name').max(100),
+  fullName: z.string().trim().min(2, "Enter your full name").max(100),
   email,
-  phone: z.string().trim().min(7).max(20).optional(),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^[\d\s+\-().]{7,20}$/, "Enter a valid phone number")
+    .optional(),
   birthDate,
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']),
+  gender: z.enum(["MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"]),
   password,
 });
 
 export const verifyEmailSchema = z.object({
   email,
-  code: z.string().regex(/^\d{6}$/, 'The code is 6 digits'),
+  code: z.string().regex(/^\d{6}$/, "The code is 6 digits"),
 });
 
 export const loginSchema = z.object({
-  email,
-  password: z.string().min(1, 'Enter your password'), 
+  identifier: z.string().trim().min(3, 'Enter your email or phone number'),
+  password: z.string().min(1, 'Enter your password'),
 });
 
 export const resendOtpSchema = z.object({

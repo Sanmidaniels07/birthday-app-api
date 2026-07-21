@@ -14,6 +14,8 @@ import { signAccessToken } from "./auth.tokens.js";
 import { env } from "../../config/env.js";
 import type { LoginInput } from "./auth.schemas.js";
 import { syncUserCommunities } from "../communities/communities.sync.js";
+import { normalizePhone } from '../../utils/phone.js'; 
+
 
 const OTP_TTL_MIN = 10;
 const MAX_OTP_ATTEMPTS = 5;
@@ -50,6 +52,7 @@ function dispatchVerificationEmail(email: string, fullName: string, otp: string)
   );
 }
 
+
 export async function signup(input: SignupInput): Promise<{ email: string; otp?: string }> {
   const dob = new Date(`${input.birthDate}T00:00:00Z`);
   const age = ageOn(new Date(), dob);
@@ -58,10 +61,14 @@ export async function signup(input: SignupInput): Promise<{ email: string; otp?:
     where: { email: input.email },
   });
 
-  // Verified account already owns this email → do nothing, reveal nothing.
   if (existing?.emailVerifiedAt) {
     logger.info({ email: input.email }, "signup attempt on verified email (no-op)");
     return { email: input.email };
+  }
+
+  const normalizedPhone = input.phone ? normalizePhone(input.phone) : null;
+  if (input.phone && !normalizedPhone) {
+    throw new BadRequestError('That phone number doesn\'t look valid');
   }
 
   const passwordHash = await hashPassword(input.password);
@@ -70,7 +77,6 @@ export async function signup(input: SignupInput): Promise<{ email: string; otp?:
   await prisma.$transaction(async (tx) => {
     const user = existing
       ? await tx.user.update({
-          // unverified account: claimable — overwrite with the new attempt
           where: { id: existing.id },
           data: {
             fullName: input.fullName,
@@ -80,7 +86,7 @@ export async function signup(input: SignupInput): Promise<{ email: string; otp?:
             birthDay: dob.getUTCDate(),
             ageBracket: computeAgeBracket(age),
             gender: input.gender,
-            phone: input.phone ?? null,
+            phone: normalizedPhone,
           },
         })
       : await tx.user.create({
@@ -93,11 +99,10 @@ export async function signup(input: SignupInput): Promise<{ email: string; otp?:
             birthDay: dob.getUTCDate(),
             ageBracket: computeAgeBracket(age),
             gender: input.gender,
-            phone: input.phone ?? null,
+            phone: normalizedPhone,
           },
         });
 
-    // One live OTP per purpose: kill any previous codes, then create the new one.
     await tx.otpCode.deleteMany({
       where: { userId: user.id, purpose: "EMAIL_VERIFY" },
     });
@@ -120,10 +125,8 @@ export async function signup(input: SignupInput): Promise<{ email: string; otp?:
 export async function verifyEmail(input: VerifyEmailInput): Promise<{ verified: true }> {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
 
-  // Idempotent success: already verified → just say yes.
   if (user?.emailVerifiedAt) return { verified: true };
 
-  // One generic failure for every wrong path — no enumeration oracle.
   const fail = () => new BadRequestError("Invalid or expired code");
 
   if (!user) throw fail();
@@ -138,7 +141,6 @@ export async function verifyEmail(input: VerifyEmailInput): Promise<{ verified: 
   if (otp.attempts >= MAX_OTP_ATTEMPTS) throw fail();
 
   if (!verifyOtp(otp.codeHash, input.code)) {
-    // Count the failed guess even though the request errors.
     await prisma.otpCode.update({
       where: { id: otp.id },
       data: { attempts: { increment: 1 } },
@@ -226,15 +228,18 @@ async function issueSession(
 }
 
 export async function login(input: LoginInput, meta: SessionMeta): Promise<AuthResult> {
-  const user = await prisma.user.findUnique({ where: { email: input.email } });
+  const isEmail = input.identifier.includes('@');
+  const user = isEmail
+    ? await prisma.user.findUnique({ where: { email: input.identifier.toLowerCase() } })
+    : await (async () => {
+        const normalized = normalizePhone(input.identifier);
+        return normalized ? prisma.user.findUnique({ where: { phone: normalized } }) : null;
+      })();
 
-  
   if (!user?.passwordHash || !(await verifyPassword(user.passwordHash, input.password))) {
     throw new UnauthorizedError("Invalid email or password");
   }
 
-  // Only AFTER the password is proven do we reveal account state —
-  // an attacker without the password learns nothing extra.
   if (!user.emailVerifiedAt) {
     throw new ForbiddenError("Please verify your email first");
   }
@@ -244,7 +249,6 @@ export async function login(input: LoginInput, meta: SessionMeta): Promise<AuthR
 
   await prisma.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date() } });
 
-  // Fresh login = fresh family (one family per device/session).
   return issueSession(user, randomUUID(), meta);
 }
 

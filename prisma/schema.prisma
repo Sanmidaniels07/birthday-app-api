@@ -43,6 +43,7 @@ enum CommunityType {
   BIRTHDAY    
   BIRTH_MONTH  
   AGE_BRACKET  
+  ANNIVERSARY
 }
 
 enum JoinMethod {
@@ -129,6 +130,9 @@ model User {
   birthDay   Int
   ageBracket String?
 
+  anniversaryMonth Int?
+  anniversaryDay   Int?
+
   gender Gender
 
   autoJoinBirthdayCommunities Boolean @default(true)
@@ -167,6 +171,7 @@ model User {
   reportsAgainst Report[] @relation("ReportedUser")
 
   @@index([birthMonth, birthDay])
+  @@index([anniversaryMonth, anniversaryDay])
   @@index([ageBracket])
   @@map("users")
 }
@@ -217,6 +222,7 @@ model Profile {
   visibility       ProfileVisibility @default(PUBLIC)
   showBirthYear    Boolean           @default(false)
   showAge          Boolean           @default(true)
+  showAnniversary  Boolean           @default(true)
   showLocation     Boolean           @default(true)
   showOnlineStatus Boolean           @default(true)
 

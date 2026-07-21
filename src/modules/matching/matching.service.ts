@@ -16,12 +16,12 @@ interface ScoredMatch {
   reasons: string[];
   sharedInterests: number;
 }
-
 export async function discoverMatches(userId: string, limit: number): Promise<ScoredMatch[]> {
   const me = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       birthMonth: true, birthDay: true, ageBracket: true,
+      anniversaryMonth: true, anniversaryDay: true,      // ← new
       profile: { select: { city: true, country: true } },
       interests: { select: { interestId: true } },
     },
@@ -44,13 +44,14 @@ export async function discoverMatches(userId: string, limit: number): Promise<Sc
 
   const candidateSelect = {
     id: true, birthMonth: true, birthDay: true, ageBracket: true,
+    anniversaryMonth: true, anniversaryDay: true,        // ← new
     profile: {
       select: { username: true, displayName: true, avatarUrl: true, blobTint: true, city: true, country: true },
     },
   } as const;
 
   // ---- Candidate generation: five indexed buckets, in parallel ----
-  const [twins, monthMates, bracketMates, interestMates, cityMates] = await Promise.all([
+  const [twins, monthMates, bracketMates, interestMates, cityMates, anniversaryMates] = await Promise.all([
     prisma.user.findMany({
       where: { ...visible, birthMonth: me.birthMonth, birthDay: me.birthDay },
       take: CANDIDATE_CAP, select: candidateSelect,
@@ -81,11 +82,19 @@ export async function discoverMatches(userId: string, limit: number): Promise<Sc
           take: CANDIDATE_CAP, select: candidateSelect,
         })
       : Promise.resolve([]),
+    // Anniversary bucket — surfaces couples sharing your anniversary month, even
+    // without another trait in common. Only queried if I've set one myself.
+    me.anniversaryMonth != null
+      ? prisma.user.findMany({
+          where: { ...visible, anniversaryMonth: me.anniversaryMonth },
+          take: CANDIDATE_CAP, select: candidateSelect,
+        })
+      : Promise.resolve([]),
   ]);
 
   // Union by id
   const pool = new Map<string, (typeof twins)[number]>();
-  for (const c of [...twins, ...monthMates, ...bracketMates, ...interestMates, ...cityMates]) {
+  for (const c of [...twins, ...monthMates, ...bracketMates, ...interestMates, ...cityMates, ...anniversaryMates]) {
     pool.set(c.id, c);
   }
   if (pool.size === 0) return [];
@@ -140,6 +149,19 @@ export async function discoverMatches(userId: string, limit: number): Promise<Sc
     } else if (myCountry && candCountry && candCountry === myCountry) {
       score += 5;
       reasons.push('Same country');
+    }
+
+    // Anniversary — mirrors the birthday tiers, weighted a little lower.
+    if (me.anniversaryMonth != null && me.anniversaryDay != null) {
+      const sameAnnivDay =
+        c.anniversaryMonth === me.anniversaryMonth && c.anniversaryDay === me.anniversaryDay;
+      if (sameAnnivDay) {
+        score += 40;
+        reasons.push('Anniversary twins');
+      } else if (c.anniversaryMonth === me.anniversaryMonth) {
+        score += 15;
+        reasons.push('Same anniversary month');
+      }
     }
 
     scored.push({

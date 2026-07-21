@@ -19,6 +19,7 @@ import {
 import { isOnline } from "../../sockets/index.js";
 import { syncUserCommunities } from "../communities/communities.sync.js";
 import { logger } from "../../lib/logger.js";
+import { splitDate } from "../../utils/phone.js";
 
 export async function isUsernameAvailable(u: string): Promise<boolean> {
   const existing = await prisma.profile.findUnique({
@@ -81,7 +82,13 @@ export async function setupProfile(userId: string, input: SetupProfileInput) {
     }
     throw err;
   }
-
+  if (input.anniversaryDate) {
+    const { month, day } = splitDate(input.anniversaryDate);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { anniversaryMonth: month, anniversaryDay: day },
+    });
+  }
   void syncUserCommunities(userId).catch((err) =>
     logger.error({ err, userId }, "community sync on setup failed"),
   );
@@ -204,29 +211,35 @@ export async function getProfileByUsername(username: string, viewerId: string) {
       : {}),
   };
 }
-
 export async function updateProfile(userId: string, input: UpdateProfileInput) {
-  const profile = await prisma.profile.findUnique({
-    where: { userId },
-    select: { id: true },
-  });
-  if (!profile) throw new NotFoundError("Profile"); // setup first, then update
+  const profile = await prisma.profile.findUnique({ where: { userId }, select: { id: true } });
+  if (!profile) throw new NotFoundError("Profile");
 
-  return prisma.profile.update({
-    where: { userId },
-    data: input,
-    select: {
-      ...publicProfileSelect,
-      showBirthYear: true,
-      showAge: true,
-      showLocation: true,
-      showOnlineStatus: true,
-      city: true,
-      country: true,
-    },
+  const { anniversaryDate, ...profileFields } = input;
+  const touchesAnniversary = anniversaryDate !== undefined;
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (touchesAnniversary) {
+      const parsed = anniversaryDate ? splitDate(anniversaryDate) : { month: null, day: null };
+      await tx.user.update({
+        where: { id: userId },
+        data: { anniversaryMonth: parsed.month, anniversaryDay: parsed.day },
+      });
+    }
+    return tx.profile.update({
+      where: { userId },
+      data: profileFields,
+      select: {
+        ...publicProfileSelect,
+        showBirthYear: true, showAge: true, showAnniversary: true,
+        showLocation: true, showOnlineStatus: true, city: true, country: true,
+      },
+    });
   });
+
+  if (touchesAnniversary) await syncUserCommunities(userId);
+  return updated;
 }
-
 export async function listInterests() {
   return prisma.interest.findMany({
     orderBy: { name: "asc" },
