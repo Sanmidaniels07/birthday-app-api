@@ -166,6 +166,9 @@ model User {
   notificationsCaused Notification[]         @relation("NotificationActor")
   notificationPrefs   NotificationPreference?
   pushSubscriptions   PushSubscription[]
+  stories        Story[]
+  storyViews     StoryView[]
+  storyReactions StoryReaction[]
 
   reportsFiled   Report[] @relation("Reporter")
   reportsAgainst Report[] @relation("ReportedUser")
@@ -217,6 +220,7 @@ model Profile {
   username    String  @unique
   bio         String? @db.VarChar(500)
   avatarUrl   String?
+  coverUrl    String?
   blobTint    String?
 
   visibility       ProfileVisibility @default(PUBLIC)
@@ -470,6 +474,7 @@ model Message {
   replyToId String?
   replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies   Message[] @relation("MessageReplies")
+  replyToStoryId String?
 
   editedAt  DateTime?
   deletedAt DateTime?
@@ -588,4 +593,48 @@ model Report {
   @@index([status, createdAt])
   @@index([reportedUserId])
   @@map("reports")
+}
+
+model Story {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  mediaUrl  String
+  mediaType String        // "IMAGE" | "VIDEO"
+  caption   String?  @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  views     StoryView[]
+  reactions StoryReaction[]
+
+  @@index([userId, expiresAt])
+  @@map("stories")
+}
+
+model StoryView {
+  id       String   @id @default(cuid())
+  storyId  String
+  viewerId String
+  story    Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewer   User     @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  viewedAt DateTime @default(now())
+
+  @@unique([storyId, viewerId])
+  @@map("story_views")
+}
+
+model StoryReaction {
+  id        String   @id @default(cuid())
+  storyId   String
+  userId    String
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([storyId, userId])
+  @@map("story_reactions")
 }

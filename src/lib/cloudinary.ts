@@ -15,6 +15,8 @@ if (cloudinaryEnabled) {
   });
 }
 
+export { cloudinary };
+
 /** Dev and staging share one free-tier cloud — folders provide the isolation. */
 export const MEDIA_ROOT = `bday-${env.NODE_ENV}`;
 
@@ -88,6 +90,48 @@ export function signChatMediaUpload(userId: string, kind: ChatMediaKind) {
     resourceType: policy.resourceType,
     apiKey: env.CLOUDINARY_API_KEY!,
     cloudName: env.CLOUDINARY_CLOUD_NAME!,
+    uploadUrl: `https://api.cloudinary.com/v1_1/${env.CLOUDINARY_CLOUD_NAME}/${policy.resourceType}/upload`,
+  };
+}
+
+
+export function signCoverUpload(userId: string) {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params = {
+    timestamp,
+    folder: `${MEDIA_ROOT}/covers`,
+    public_id: `cover_${userId}`,
+    overwrite: 'true',
+    transformation: 'c_fill,g_auto,w_1200,h_400,q_auto,f_auto', // wide banner crop, not square
+  };
+  const signature = cloudinary.utils.api_sign_request(params, env.CLOUDINARY_API_SECRET!);
+  return {
+    ...params, signature,
+    apiKey: env.CLOUDINARY_API_KEY!, cloudName: env.CLOUDINARY_CLOUD_NAME!,
+    uploadUrl: `https://api.cloudinary.com/v1_1/${env.CLOUDINARY_CLOUD_NAME}/image/upload`,
+  };
+}
+
+export type StoryMediaKind = 'image' | 'video';
+
+const STORY_MEDIA_POLICY: Record<StoryMediaKind, { resourceType: 'image' | 'video'; transformation?: string }> = {
+  image: { resourceType: 'image', transformation: 'c_limit,w_1200,h_1200,q_auto,f_auto' },
+  video: { resourceType: 'video', transformation: 'c_limit,w_1200,h_1200,q_auto' },
+};
+
+export function signStoryUpload(userId: string, kind: StoryMediaKind) {
+  const policy = STORY_MEDIA_POLICY[kind];
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params: Record<string, string | number> = {
+    timestamp,
+    folder: `${MEDIA_ROOT}/stories/${userId}`,
+    public_id: `story_${randomUUID()}`,
+    ...(policy.transformation ? { transformation: policy.transformation } : {}),
+  };
+  const signature = cloudinary.utils.api_sign_request(params, env.CLOUDINARY_API_SECRET!);
+  return {
+    ...params, signature, kind, resourceType: policy.resourceType,
+    apiKey: env.CLOUDINARY_API_KEY!, cloudName: env.CLOUDINARY_CLOUD_NAME!,
     uploadUrl: `https://api.cloudinary.com/v1_1/${env.CLOUDINARY_CLOUD_NAME}/${policy.resourceType}/upload`,
   };
 }

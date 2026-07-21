@@ -11,6 +11,7 @@ import {
   confirmAvatarSchema,
   searchQuerySchema,
   username,
+  confirmCoverSchema,
 } from "./profiles.schemas.js";
 import * as controller from "./profiles.controller.js";
 
@@ -35,3 +36,6 @@ profilesRouter.get("/search", requireAuth, validate({ query: searchQuerySchema }
 // ---- Wildcard routes LAST ----
 profilesRouter.get("/:username/presence", requireAuth, validate({ params: z.object({ username }) }), controller.presence);
 profilesRouter.get("/:username", requireAuth, validate({ params: z.object({ username }) }), controller.getByUsername);
+
+profilesRouter.post('/me/cover/sign', requireAuth, controller.signCover);
+profilesRouter.post('/me/cover/confirm', requireAuth, validate({ body: confirmCoverSchema }), controller.confirmCover);

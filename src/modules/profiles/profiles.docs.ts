@@ -101,3 +101,15 @@ registerEndpoint({
   summary: 'My own full profile (all private fields)', secured: true,
   responses: { '200': { description: 'My profile' }, '404': { description: 'No profile yet' } },
 });
+
+registerEndpoint({
+  method: 'post', path: '/profiles/me/cover/sign', tag: 'Profiles',
+  summary: 'Get a signed direct-upload grant for my cover photo', secured: true,
+  responses: { '200': { description: 'Signed Cloudinary upload params' } },
+});
+
+registerEndpoint({
+  method: 'post', path: '/profiles/me/cover/confirm', tag: 'Profiles',
+  summary: 'Confirm the uploaded cover photo public id', secured: true,
+  responses: { '200': { description: 'Updated profile' } },
+});

@@ -10,6 +10,7 @@ import {
   cloudinaryEnabled,
   signAvatarUpload,
   MEDIA_ROOT,
+   signCoverUpload as signCoverUploadGrant 
 } from "../../lib/cloudinary.js";
 import {
   blockExistsBetween,
@@ -20,6 +21,7 @@ import { isOnline } from "../../sockets/index.js";
 import { syncUserCommunities } from "../communities/communities.sync.js";
 import { logger } from "../../lib/logger.js";
 import { splitDate } from "../../utils/phone.js";
+
 
 export async function isUsernameAvailable(u: string): Promise<boolean> {
   const existing = await prisma.profile.findUnique({
@@ -101,6 +103,7 @@ const publicProfileSelect = {
   displayName: true,
   bio: true,
   avatarUrl: true,
+  coverUrl: true,
   blobTint: true,
   visibility: true,
   createdAt: true,
@@ -370,4 +373,23 @@ export async function getMyProfile(userId: string) {
   });
   if (!profile) throw new NotFoundError("Profile");
   return profile;
+}
+
+
+export function signCoverUpload(userId: string) {
+  return signCoverUploadGrant(userId);
+}
+
+export async function confirmCoverUpload(userId: string, publicId: string) {
+  const profile = await prisma.profile.findUnique({ where: { userId }, select: { id: true } });
+  if (!profile) throw new NotFoundError('Profile');
+
+  return prisma.profile.update({
+    where: { userId },
+    data: { coverUrl: publicId },
+    select: {
+      ...publicProfileSelect,
+      coverUrl: true,
+    },
+  });
 }

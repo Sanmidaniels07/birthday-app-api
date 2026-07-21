@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import * as profilesService from './profiles.service.js';
 import { ok } from '../../utils/response.js';
+import { signCoverUpload } from '../../lib/cloudinary.js';
 
 export async function usernameAvailable(req: Request, res: Response) {
   const u = req.query.u as string; 
@@ -56,4 +57,12 @@ export async function presence(req: Request, res: Response) {
 
 export async function myProfile(req: Request, res: Response) {
   ok(res, await profilesService.getMyProfile(req.user!.sub));
+}
+
+export async function signCover(req: Request, res: Response) {
+  ok(res, signCoverUpload(req.user!.sub));
+}
+
+export async function confirmCover(req: Request, res: Response) {
+  ok(res, await profilesService.confirmCoverUpload(req.user!.sub, req.body.publicId));
 }

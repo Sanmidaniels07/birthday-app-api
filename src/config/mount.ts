@@ -11,6 +11,7 @@ import { notificationsRouter } from '../modules/notifications/notifications.rout
 import { reportsRouter } from '../modules/reports/reports.routes.js';
 import { adminRouter } from '../modules/admin/admin.routes.js';
 import { healthRouter } from '../modules/health/health.routes.js';
+import { storiesRouter } from '../modules/stories/stories.routes.js';
 
 /**
  * THE mount registry. app.ts mounts from this list; the wiring
@@ -30,4 +31,5 @@ export const MOUNTS: Array<{ path: string; router: Router; module: string }> = [
   { path: '/notifications', router: notificationsRouter, module: 'notifications' },
   { path: '/reports', router: reportsRouter, module: 'reports' },
   { path: '/admin', router: adminRouter, module: 'admin' },
+  { path: '/stories', router: storiesRouter, module: 'stories' },
 ];

@@ -12,6 +12,7 @@ import '../modules/calls/calls.docs.js';
 import '../modules/notifications/notifications.docs.js';
 import '../modules/reports/reports.docs.js'
 import '../modules/admin/admin.docs.js'
+import '../modules/stories/stories.docs.js'   
 
 export const openApiSpec = {
   openapi: '3.1.0',
@@ -35,7 +36,9 @@ export const openApiSpec = {
     { name: 'Calls', description: 'Voice/video call lifecycle, history, ICE servers' },
     { name: 'Notifications', description: 'Inbox, unread counts, preferences, web push' },
     { name: 'Reports', description: 'User reporting' },
-    { name: 'Admin', description: 'Moderation queue and enforcement (staff only)' }
+    { name: 'Admin', description: 'Moderation queue and enforcement (staff only)' },
+    { name: 'Stories', description: '24-hour ephemeral stories: post, view, react' },   // ← new
+
   ],
   components: {
     securitySchemes: {
