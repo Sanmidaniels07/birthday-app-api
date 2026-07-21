@@ -19,7 +19,9 @@ const textMessage = z.object({
   type: z.literal('TEXT').default('TEXT'),
   body: z.string().trim().min(1).max(4000),
   replyToId: z.string().min(1).optional(),
+  replyToStoryId: z.string().min(1).optional(),   // ← add
 });
+
 
 const MEDIA_KINDS = ['IMAGE', 'VOICE_NOTE', 'AUDIO', 'VIDEO'] as const;
 const MEDIA_SIZE_LIMITS: Record<(typeof MEDIA_KINDS)[number], number> = {
@@ -32,11 +34,12 @@ const MEDIA_SIZE_LIMITS: Record<(typeof MEDIA_KINDS)[number], number> = {
 const mediaMessage = z
   .object({
     type: z.enum(MEDIA_KINDS),
-    body: z.string().trim().max(1000).optional(), // caption
-    mediaUrl: z.string().min(1).max(300),         // Cloudinary public id
-    mediaDuration: z.coerce.number().int().positive().max(600).optional(), // ≤10 min
+    body: z.string().trim().max(1000).optional(),
+    mediaUrl: z.string().min(1).max(300),
+    mediaDuration: z.coerce.number().int().positive().max(600).optional(),
     mediaSize: z.coerce.number().int().positive(),
     replyToId: z.string().min(1).optional(),
+    replyToStoryId: z.string().min(1).optional(),   // ← add
   })
   .refine((m) => m.mediaSize <= MEDIA_SIZE_LIMITS[m.type], {
     message: 'File exceeds the size limit for this media type',
@@ -44,6 +47,7 @@ const mediaMessage = z
   .refine((m) => !['VOICE_NOTE', 'AUDIO', 'VIDEO'].includes(m.type) || m.mediaDuration !== undefined, {
     message: 'Duration is required for audio and video messages',
   });
+
 
 export const sendMessageSchema = z.union([textMessage, mediaMessage]);
 

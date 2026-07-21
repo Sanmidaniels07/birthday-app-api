@@ -367,7 +367,6 @@ export async function sendMessage(
     }
   }
 
-  // Media messages: the claimed public id must live in MY chat namespace.
   const isMedia = input.type !== "TEXT";
   if (isMedia) {
     const prefix = `${MEDIA_ROOT}/chat/${actorId}/`;
@@ -390,6 +389,7 @@ export async function sendMessage(
             : null,
         mediaSize: isMedia && "mediaSize" in input ? input.mediaSize : null,
         replyToId: input.replyToId ?? null,
+        replyToStoryId: input.replyToStoryId ?? null,   // ← add
       },
       select: messageCardSelect,
     }),
@@ -404,8 +404,6 @@ export async function sendMessage(
     .to(`conversation:${conversationId}`)
     .emit(SocketEvents.MESSAGE_NEW, { message: presented });
 
-  // Notify participants who are OFFLINE — online users saw message:new.
-  // The socket is the live layer; notifications are the reach layer.
   void notifyOfflineParticipants(conversationId, actorId, message).catch(
     (err) => logger.error({ err }, "message notification failed"),
   );
