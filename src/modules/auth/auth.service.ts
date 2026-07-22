@@ -36,8 +36,8 @@ interface SessionMeta {
 
 interface AuthResult {
   accessToken: string;
-  refreshToken: string; 
-  user: { id: string; fullName: string; email: string; role: string };
+  refreshToken: string;
+  user: { id: string; fullName: string; email: string; role: string; username: string | null };
 }
 
 /** Build and fire the verification email without blocking the request. */
@@ -203,7 +203,13 @@ const refreshExpiry = () =>
   new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
 
 async function issueSession(
-  user: { id: string; fullName: string; email: string; role: "USER" | "MODERATOR" | "ADMIN" },
+  user: {
+    id: string;
+    fullName: string;
+    email: string;
+    role: "USER" | "MODERATOR" | "ADMIN";
+    profile: { username: string } | null;
+  },
   familyId: string,
   meta: SessionMeta,
 ): Promise<AuthResult> {
@@ -223,17 +229,31 @@ async function issueSession(
   return {
     accessToken: signAccessToken({ sub: user.id, role: user.role }),
     refreshToken,
-    user: { id: user.id, fullName: user.fullName, email: user.email, role: user.role },
+    user: {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      username: user.profile?.username ?? null,   
+    },
   };
 }
 
 export async function login(input: LoginInput, meta: SessionMeta): Promise<AuthResult> {
   const isEmail = input.identifier.includes('@');
   const user = isEmail
-    ? await prisma.user.findUnique({ where: { email: input.identifier.toLowerCase() } })
+    ? await prisma.user.findUnique({
+        where: { email: input.identifier.toLowerCase() },
+        include: { profile: { select: { username: true } } },
+      })
     : await (async () => {
         const normalized = normalizePhone(input.identifier);
-        return normalized ? prisma.user.findUnique({ where: { phone: normalized } }) : null;
+        return normalized
+          ? prisma.user.findUnique({
+              where: { phone: normalized },
+              include: { profile: { select: { username: true } } },
+            })
+          : null;
       })();
 
   if (!user?.passwordHash || !(await verifyPassword(user.passwordHash, input.password))) {
@@ -256,14 +276,11 @@ export async function refresh(presentedToken: string, meta: SessionMeta): Promis
   const tokenHash = hashRefreshToken(presentedToken);
   const stored = await prisma.refreshToken.findUnique({
     where: { tokenHash },
-    include: { user: true },
+    include: { user: { include: { profile: { select: { username: true } } } } },
   });
 
   if (!stored) throw new UnauthorizedError("Invalid session");
 
-  // ── REUSE DETECTED ──
-  // This token was already consumed. Two parties hold one token;
-  // one of them is a thief. Kill the whole family.
   if (stored.revokedAt) {
     await prisma.refreshToken.updateMany({
       where: { familyId: stored.familyId, revokedAt: null },
@@ -279,7 +296,6 @@ export async function refresh(presentedToken: string, meta: SessionMeta): Promis
   if (stored.expiresAt < new Date()) throw new UnauthorizedError("Session expired");
   if (stored.user.status !== "ACTIVE") throw new UnauthorizedError("This account is not active");
 
-  // Rotate: consume this token, issue the next in the SAME family.
   await prisma.refreshToken.update({
     where: { id: stored.id },
     data: { revokedAt: new Date() },
