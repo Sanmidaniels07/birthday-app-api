@@ -183,6 +183,7 @@ export async function getProfileByUsername(username: string, viewerId: string) {
     displayName: profile.displayName,
     bio: profile.bio,
     avatarUrl: profile.avatarUrl,
+    coverUrl: profile.coverUrl,
     blobTint: profile.blobTint,
     isOwner,
     // Relationship context for the frontend's button logic:
