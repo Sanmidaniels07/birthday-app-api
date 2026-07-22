@@ -9,6 +9,7 @@ import {
   reactionSchema,
   addCommentSchema,
   commentIdParam,
+  editPostSchema,
 } from './feed.schemas.js';
 import { usernameParam } from '../social/social.schemas.js';
 import * as controller from './feed.controller.js';
@@ -31,3 +32,4 @@ feedRouter.get('/posts/:postId/reactions', validate({ params: postIdParam }), co
 feedRouter.post('/posts/:postId/comments', interactionLimiter, validate({ params: postIdParam, body: addCommentSchema }), controller.comment);
 feedRouter.get('/posts/:postId/comments', validate({ params: postIdParam, query: feedQuerySchema }), controller.comments);
 feedRouter.delete('/comments/:commentId', validate({ params: commentIdParam }), controller.removeComment);
+feedRouter.patch('/posts/:postId', requireAuth, validate({ body: editPostSchema }), controller.editPost);

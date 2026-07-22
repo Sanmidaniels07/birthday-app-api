@@ -356,3 +356,19 @@ export async function birthdaysToday(viewerId: string) {
 
   return users.filter((u) => u.profile !== null).map((u) => u.profile);
 }
+
+export async function editPost(userId: string, postId: string, body: string) {
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    select: { authorId: true, deletedAt: true },
+  });
+  if (!post || post.deletedAt || post.authorId !== userId) {
+    throw new NotFoundError('Post');
+  }
+
+  return prisma.post.update({
+    where: { id: postId },
+    data: { body },
+    select: postCardSelect, // whatever your existing post-response select is named
+  });
+}

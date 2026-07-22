@@ -57,3 +57,7 @@ export async function removeComment(req: Request, res: Response) {
 export async function birthdays(req: Request, res: Response) {
   ok(res, await service.birthdaysToday(req.user!.sub));
 }
+
+export async function editPost(req: Request, res: Response) {
+  ok(res, await service.editPost(req.user!.sub, req.params.postId as string, req.body.body));
+}

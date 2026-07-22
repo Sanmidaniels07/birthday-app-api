@@ -90,3 +90,9 @@ registerEndpoint({
     '200': { description: 'Profile cards to celebrate', example: { data: [{ username: 'maya_s', displayName: 'Maya', blobTint: 'blush' }] } },
   },
 });
+
+registerEndpoint({
+  method: 'patch', path: '/feed/posts/{postId}', tag: 'Feed',
+  summary: 'Edit my post caption (text only, no time limit)', secured: true,
+  responses: { '200': { description: 'Updated post' } },
+});

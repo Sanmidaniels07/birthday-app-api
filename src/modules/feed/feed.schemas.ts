@@ -46,3 +46,8 @@ export const addCommentSchema = z.object({
 });
 
 export const commentIdParam = z.object({ commentId: z.string().min(1) });
+
+export const editPostSchema = z.object({
+  body: z.string().trim().min(1).max(2000),
+});
+export type EditPostInput = z.infer<typeof editPostSchema>;
