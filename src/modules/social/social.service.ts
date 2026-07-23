@@ -221,7 +221,34 @@ export async function unfollow(followerId: string, targetUsername: string) {
   return { following: false };
 }
 
-export async function listFollowing(userId: string) {
+async function resolveNetworkTarget(viewerId: string, targetUsername?: string): Promise<string> {
+  if (!targetUsername) return viewerId;
+
+  const targetId = await resolveTarget(targetUsername); // existing helper — throws NotFoundError if no such user
+  if (targetId === viewerId) return targetId;
+
+  if (await blockExistsBetween(viewerId, targetId)) throw new NotFoundError('User');
+
+  const profile = await prisma.profile.findUnique({
+    where: { userId: targetId },
+    select: { visibility: true },
+  });
+  if (!profile) throw new NotFoundError('User');
+
+  if (profile.visibility === 'PRIVATE') throw new NotFoundError('User');
+  if (profile.visibility === 'FRIENDS_ONLY' && !(await areFriends(viewerId, targetId))) {
+    throw new NotFoundError('User');
+  }
+
+  return targetId;
+}
+
+const networkRowSelect = {
+  username: true, displayName: true, avatarUrl: true, blobTint: true,
+} as const;
+
+export async function listFollowing(viewerId: string, targetUsername?: string) {
+  const userId = await resolveNetworkTarget(viewerId, targetUsername);
   const rows = await prisma.follow.findMany({
     where: { followerId: userId },
     orderBy: { createdAt: 'desc' },
@@ -232,7 +259,8 @@ export async function listFollowing(userId: string) {
     .map((r) => ({ ...r.followee.profile, followedAt: r.createdAt }));
 }
 
-export async function listFollowers(userId: string) {
+export async function listFollowers(viewerId: string, targetUsername?: string) {
+  const userId = await resolveNetworkTarget(viewerId, targetUsername);
   const rows = await prisma.follow.findMany({
     where: { followeeId: userId },
     orderBy: { createdAt: 'desc' },

@@ -117,6 +117,7 @@ export async function getProfileByUsername(username: string, viewerId: string) {
       userId: true,
       showBirthYear: true,
       showAge: true,
+      showAnniversary: true,
       showLocation: true,
       city: true,
       country: true,
@@ -127,6 +128,8 @@ export async function getProfileByUsername(username: string, viewerId: string) {
           birthDate: true,
           ageBracket: true,
           lastSeenAt: true,
+          anniversaryMonth: true,
+          anniversaryDay: true,
         },
       },
     },
@@ -134,7 +137,6 @@ export async function getProfileByUsername(username: string, viewerId: string) {
 
   const isOwner = profile?.userId === viewerId;
 
-  // Blocked in either direction = does not exist, same as missing/private.
   if (
     profile &&
     !isOwner &&
@@ -147,7 +149,6 @@ export async function getProfileByUsername(username: string, viewerId: string) {
     throw new NotFoundError("Profile");
   }
 
-  // Relationship context — one parallel batch, no waterfalls.
   const [friends, pendingRequest, followRow] = isOwner
     ? [false, null, null]
     : await Promise.all([
@@ -173,7 +174,6 @@ export async function getProfileByUsername(username: string, viewerId: string) {
         }),
       ]);
 
-  // The P3 TODO, honored: FRIENDS_ONLY admits friends.
   if (profile.visibility === "FRIENDS_ONLY" && !isOwner && !friends) {
     throw new NotFoundError("Profile");
   }
@@ -186,7 +186,6 @@ export async function getProfileByUsername(username: string, viewerId: string) {
     coverUrl: profile.coverUrl,
     blobTint: profile.blobTint,
     isOwner,
-    // Relationship context for the frontend's button logic:
     relationship: isOwner
       ? null
       : {
@@ -213,8 +212,12 @@ export async function getProfileByUsername(username: string, viewerId: string) {
     ...(profile.showLocation || isOwner
       ? { city: profile.city, country: profile.country }
       : {}),
+    ...(profile.showAnniversary || isOwner
+      ? { anniversaryMonth: profile.user.anniversaryMonth, anniversaryDay: profile.user.anniversaryDay }
+      : {}),
   };
 }
+
 export async function updateProfile(userId: string, input: UpdateProfileInput) {
   const profile = await prisma.profile.findUnique({ where: { userId }, select: { id: true } });
   if (!profile) throw new NotFoundError("Profile");

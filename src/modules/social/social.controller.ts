@@ -34,10 +34,10 @@ export async function unfollow(req: Request, res: Response) {
   ok(res, await service.unfollow(req.user!.sub, req.params.username as string));
 }
 export async function following(req: Request, res: Response) {
-  ok(res, await service.listFollowing(req.user!.sub));
+  ok(res, await service.listFollowing(req.user!.sub, req.query.username as string | undefined));
 }
 export async function followers(req: Request, res: Response) {
-  ok(res, await service.listFollowers(req.user!.sub));
+  ok(res, await service.listFollowers(req.user!.sub, req.query.username as string | undefined));
 }
 export async function block(req: Request, res: Response) {
   ok(res, await service.blockUser(req.user!.sub, req.params.username as string));
