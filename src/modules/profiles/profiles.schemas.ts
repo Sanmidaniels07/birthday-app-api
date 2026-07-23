@@ -73,5 +73,6 @@ export const searchQuerySchema = z.object({
 
 export const confirmCoverSchema = z.object({
   publicId: z.string().min(1).max(200),
+  version: z.coerce.number().int().positive().optional(),
 });
 export type ConfirmCoverInput = z.infer<typeof confirmCoverSchema>;

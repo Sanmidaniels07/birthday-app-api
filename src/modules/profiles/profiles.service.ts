@@ -402,13 +402,15 @@ export function signCoverUpload(userId: string) {
   return signCoverUploadGrant(userId);
 }
 
-export async function confirmCoverUpload(userId: string, publicId: string) {
+export async function confirmCoverUpload(userId: string, publicId: string, version?: number) {
   const profile = await prisma.profile.findUnique({ where: { userId }, select: { id: true } });
   if (!profile) throw new NotFoundError('Profile');
 
+  const coverUrl = version ? `${publicId}?v=${version}` : publicId;
+
   return prisma.profile.update({
     where: { userId },
-    data: { coverUrl: publicId },
+    data: { coverUrl },
     select: {
       ...publicProfileSelect,
       coverUrl: true,

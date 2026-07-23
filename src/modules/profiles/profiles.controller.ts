@@ -64,5 +64,5 @@ export async function signCover(req: Request, res: Response) {
 }
 
 export async function confirmCover(req: Request, res: Response) {
-  ok(res, await profilesService.confirmCoverUpload(req.user!.sub, req.body.publicId));
+  ok(res, await profilesService.confirmCoverUpload(req.user!.sub, req.body.publicId, req.body.version));
 }
