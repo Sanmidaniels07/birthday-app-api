@@ -237,13 +237,21 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
         ...publicProfileSelect,
         showBirthYear: true, showAge: true, showAnniversary: true,
         showLocation: true, showOnlineStatus: true, city: true, country: true,
+        user: { select: { anniversaryMonth: true, anniversaryDay: true } },
       },
     });
   });
 
   if (touchesAnniversary) await syncUserCommunities(userId);
-  return updated;
+
+  const { user, ...rest } = updated;
+  return {
+    ...rest,
+    anniversaryMonth: user.anniversaryMonth,
+    anniversaryDay: user.anniversaryDay,
+  };
 }
+
 export async function listInterests() {
   return prisma.interest.findMany({
     orderBy: { name: "asc" },
@@ -354,6 +362,7 @@ export async function getPresence(viewerId: string, username: string) {
   return { online, lastSeenAt: online ? null : profile.user.lastSeenAt };
 }
 
+
 export async function getMyProfile(userId: string) {
   const profile = await prisma.profile.findUnique({
     where: { userId },
@@ -362,18 +371,27 @@ export async function getMyProfile(userId: string) {
       displayName: true,
       bio: true,
       avatarUrl: true,
+      coverUrl: true,
       blobTint: true,
       visibility: true,
       showBirthYear: true,
       showAge: true,
+      showAnniversary: true,
       showLocation: true,
       showOnlineStatus: true,
       city: true,
       country: true,
+      user: { select: { anniversaryMonth: true, anniversaryDay: true } },
     },
   });
   if (!profile) throw new NotFoundError("Profile");
-  return profile;
+
+  const { user, ...rest } = profile;
+  return {
+    ...rest,
+    anniversaryMonth: user.anniversaryMonth,
+    anniversaryDay: user.anniversaryDay,
+  };
 }
 
 
