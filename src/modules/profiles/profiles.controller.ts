@@ -44,7 +44,7 @@ export async function avatarSignature(req: Request, res: Response) {
 }
 
 export async function confirmAvatar(req: Request, res: Response) {
-  ok(res, await profilesService.confirmAvatar(req.user!.sub, req.body.publicId));
+  ok(res, await profilesService.confirmAvatar(req.user!.sub, req.body.publicId, req.body.version));
 }
 
 export async function search(req: Request, res: Response) {

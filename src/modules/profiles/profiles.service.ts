@@ -297,15 +297,17 @@ export function getAvatarUploadSignature(userId: string) {
   return signAvatarUpload(userId);
 }
 
-export async function confirmAvatar(userId: string, publicId: string) {
+export async function confirmAvatar(userId: string, publicId: string, version?: number) {
   const expected = `${MEDIA_ROOT}/avatars/user_${userId}`;
   if (publicId !== expected) {
     throw new BadRequestError("Unexpected avatar reference");
   }
 
+  const avatarUrl = version ? `${publicId}?v=${version}` : publicId;
+
   const profile = await prisma.profile.update({
     where: { userId },
-    data: { avatarUrl: publicId },
+    data: { avatarUrl },
     select: { username: true, avatarUrl: true },
   });
   return profile;

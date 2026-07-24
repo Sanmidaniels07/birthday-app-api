@@ -64,6 +64,7 @@ export const setInterestsSchema = z.object({
 
 export const confirmAvatarSchema = z.object({
   publicId: z.string().min(1).max(200),
+  version: z.coerce.number().int().positive().optional(),
 });
 
 export const searchQuerySchema = z.object({
