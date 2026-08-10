@@ -37,7 +37,7 @@ interface SessionMeta {
 interface AuthResult {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; fullName: string; email: string; role: string; username: string | null };
+  user: { id: string; fullName: string; email: string; role: string; username: string | null; hasProfile: boolean };
 }
 
 /** Build and fire the verification email without blocking the request. */
@@ -235,6 +235,7 @@ async function issueSession(
       email: user.email,
       role: user.role,
       username: user.profile?.username ?? null,   
+      hasProfile: user.profile !== null,
     },
   };
 }
