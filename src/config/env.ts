@@ -11,13 +11,29 @@ const envSchema = z.object({
     .enum(["development", "test", "staging", "production"])
     .default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
-  WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
+  WEB_ORIGIN: z
+    .string()
+    .default("http://localhost:3000")
+    .transform((s) =>
+      s
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean),
+    )
+    .refine(
+      (origins) => origins.every((o) => z.string().url().safeParse(o).success),
+      { message: "WEB_ORIGIN must be a comma-separated list of valid URLs" },
+    ),
   DATABASE_URL: z.string().url(),
   DIRECT_URL: z.string().url(),
 
   // ---- Auth ----
-  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 chars'),
-  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),
+  JWT_ACCESS_SECRET: z
+    .string()
+    .min(32, "JWT_ACCESS_SECRET must be at least 32 chars"),
+  JWT_REFRESH_SECRET: z
+    .string()
+    .min(32, "JWT_REFRESH_SECRET must be at least 32 chars"),
   ACCESS_TOKEN_TTL_MIN: z.coerce.number().int().positive().default(15),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
 
@@ -37,9 +53,7 @@ const envSchema = z.object({
   // ---- Web Push (VAPID) — optional; push silently disabled without ----
   VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
-  VAPID_SUBJECT: z.string().default('mailto:hello@daymate.app'),
-
-  
+  VAPID_SUBJECT: z.string().default("mailto:hello@daymate.app"),
 });
 
 const parsed = envSchema.safeParse(process.env);

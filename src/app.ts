@@ -23,9 +23,7 @@ export function createApp() {
       crossOriginResourcePolicy: { policy: "cross-origin" },
     }),
   );
-  const allowedOrigins = env.WEB_ORIGIN.split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const allowedOrigins = env.WEB_ORIGIN;
   app.use(
     cors({
       origin: (origin, cb) => {
