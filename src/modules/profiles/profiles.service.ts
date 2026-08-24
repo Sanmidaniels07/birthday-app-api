@@ -84,6 +84,7 @@ export async function setupProfile(userId: string, input: SetupProfileInput) {
     }
     throw err;
   }
+
   if (input.anniversaryDate) {
     const { month, day } = splitDate(input.anniversaryDate);
     await prisma.user.update({
@@ -91,6 +92,8 @@ export async function setupProfile(userId: string, input: SetupProfileInput) {
       data: { anniversaryMonth: month, anniversaryDay: day },
     });
   }
+
+  // Intentionally leave onboardingComplete = false
   void syncUserCommunities(userId).catch((err) =>
     logger.error({ err, userId }, "community sync on setup failed"),
   );
@@ -418,4 +421,27 @@ export async function confirmCoverUpload(userId: string, publicId: string, versi
       coverUrl: true,
     },
   });
+}
+export async function completeOnboarding(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      onboardingComplete: true,
+      profile: { select: { id: true } },
+    },
+  });
+  if (!user) throw new NotFoundError("User");
+  if (!user.profile) throw new BadRequestError("Profile must be set up first");
+
+  if (user.onboardingComplete) {
+    return { onboardingComplete: true };
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { onboardingComplete: true },
+  });
+
+  return { onboardingComplete: true };
 }

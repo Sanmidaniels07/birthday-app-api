@@ -23,6 +23,11 @@ profilesRouter.post("/setup", requireAuth, validate({ body: setupProfileSchema }
 profilesRouter.get("/me", requireAuth, controller.myProfile);
 profilesRouter.patch("/me", requireAuth, validate({ body: updateProfileSchema }), controller.update);
 
+profilesRouter.post(
+  "/me/complete-onboarding",
+  requireAuth,
+  controller.completeOnboarding,
+);
 profilesRouter.get("/me/interests", requireAuth, controller.myInterests);
 profilesRouter.put("/me/interests", requireAuth, validate({ body: setInterestsSchema }), controller.setInterests);
 

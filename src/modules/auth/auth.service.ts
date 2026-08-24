@@ -1,7 +1,16 @@
 import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
-import { hashPassword, generateOtp, hashOtp, verifyOtp } from "./auth.crypto.js";
-import { ageOn, type SignupInput, type VerifyEmailInput } from "./auth.schemas.js";
+import {
+  hashPassword,
+  generateOtp,
+  hashOtp,
+  verifyOtp,
+} from "./auth.crypto.js";
+import {
+  ageOn,
+  type SignupInput,
+  type VerifyEmailInput,
+} from "./auth.schemas.js";
 import { verificationEmail } from "../../templates/verification.template.js";
 import { sendEmail } from "../../lib/email.js";
 import { isProd } from "../../config/env.js";
@@ -9,13 +18,16 @@ import { BadRequestError } from "../../utils/errors.js";
 
 import { randomUUID } from "node:crypto";
 import { UnauthorizedError, ForbiddenError } from "../../utils/errors.js";
-import { verifyPassword, generateRefreshToken, hashRefreshToken } from "./auth.crypto.js";
+import {
+  verifyPassword,
+  generateRefreshToken,
+  hashRefreshToken,
+} from "./auth.crypto.js";
 import { signAccessToken } from "./auth.tokens.js";
 import { env } from "../../config/env.js";
 import type { LoginInput } from "./auth.schemas.js";
 import { syncUserCommunities } from "../communities/communities.sync.js";
-import { normalizePhone } from '../../utils/phone.js'; 
-
+import { normalizePhone } from "../../utils/phone.js";
 
 const OTP_TTL_MIN = 10;
 const MAX_OTP_ATTEMPTS = 5;
@@ -37,11 +49,23 @@ interface SessionMeta {
 interface AuthResult {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; fullName: string; email: string; role: string; username: string | null; hasProfile: boolean };
+  user: {
+    id: string;
+    fullName: string;
+    email: string;
+    role: string;
+    username: string | null;
+    hasProfile: boolean;
+    onboardingComplete: boolean;
+  };
 }
 
 /** Build and fire the verification email without blocking the request. */
-function dispatchVerificationEmail(email: string, fullName: string, otp: string): void {
+function dispatchVerificationEmail(
+  email: string,
+  fullName: string,
+  otp: string,
+): void {
   const mail = verificationEmail({
     name: fullName.split(" ")[0] ?? "there",
     code: otp,
@@ -52,8 +76,9 @@ function dispatchVerificationEmail(email: string, fullName: string, otp: string)
   );
 }
 
-
-export async function signup(input: SignupInput): Promise<{ email: string; otp?: string }> {
+export async function signup(
+  input: SignupInput,
+): Promise<{ email: string; otp?: string }> {
   const dob = new Date(`${input.birthDate}T00:00:00Z`);
   const age = ageOn(new Date(), dob);
 
@@ -62,13 +87,16 @@ export async function signup(input: SignupInput): Promise<{ email: string; otp?:
   });
 
   if (existing?.emailVerifiedAt) {
-    logger.info({ email: input.email }, "signup attempt on verified email (no-op)");
+    logger.info(
+      { email: input.email },
+      "signup attempt on verified email (no-op)",
+    );
     return { email: input.email };
   }
 
   const normalizedPhone = input.phone ? normalizePhone(input.phone) : null;
   if (input.phone && !normalizedPhone) {
-    throw new BadRequestError('That phone number doesn\'t look valid');
+    throw new BadRequestError("That phone number doesn't look valid");
   }
 
   const passwordHash = await hashPassword(input.password);
@@ -122,7 +150,9 @@ export async function signup(input: SignupInput): Promise<{ email: string; otp?:
   return { email: input.email, ...(isProd ? {} : { otp }) };
 }
 
-export async function verifyEmail(input: VerifyEmailInput): Promise<{ verified: true }> {
+export async function verifyEmail(
+  input: VerifyEmailInput,
+): Promise<{ verified: true }> {
   const user = await prisma.user.findUnique({ where: { email: input.email } });
 
   if (user?.emailVerifiedAt) return { verified: true };
@@ -153,7 +183,7 @@ export async function verifyEmail(input: VerifyEmailInput): Promise<{ verified: 
       where: { id: user.id },
       data: { emailVerifiedAt: new Date() },
     }),
-    
+
     prisma.otpCode.update({
       where: { id: otp.id },
       data: { consumedAt: new Date() },
@@ -161,13 +191,18 @@ export async function verifyEmail(input: VerifyEmailInput): Promise<{ verified: 
   ]);
 
   void syncUserCommunities(user.id).catch((err) =>
-    logger.error({ err, userId: user.id }, "community sync after verification failed"),
+    logger.error(
+      { err, userId: user.id },
+      "community sync after verification failed",
+    ),
   );
 
   return { verified: true };
 }
 
-export async function resendOtp(email: string): Promise<{ email: string; otp?: string }> {
+export async function resendOtp(
+  email: string,
+): Promise<{ email: string; otp?: string }> {
   const user = await prisma.user.findUnique({ where: { email } });
 
   // Unknown or already-verified: pretend we sent. No enumeration oracle.
@@ -198,7 +233,6 @@ export async function resendOtp(email: string): Promise<{ email: string; otp?: s
   return { email, ...(!isProd ? { otp } : {}) };
 }
 
-
 const refreshExpiry = () =>
   new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
 
@@ -208,6 +242,7 @@ async function issueSession(
     fullName: string;
     email: string;
     role: "USER" | "MODERATOR" | "ADMIN";
+    onboardingComplete: boolean;
     profile: { username: string } | null;
   },
   familyId: string,
@@ -234,14 +269,18 @@ async function issueSession(
       fullName: user.fullName,
       email: user.email,
       role: user.role,
-      username: user.profile?.username ?? null,   
+      username: user.profile?.username ?? null,
       hasProfile: user.profile !== null,
+      onboardingComplete: user.onboardingComplete,
     },
   };
 }
 
-export async function login(input: LoginInput, meta: SessionMeta): Promise<AuthResult> {
-  const isEmail = input.identifier.includes('@');
+export async function login(
+  input: LoginInput,
+  meta: SessionMeta,
+): Promise<AuthResult> {
+  const isEmail = input.identifier.includes("@");
   const user = isEmail
     ? await prisma.user.findUnique({
         where: { email: input.identifier.toLowerCase() },
@@ -257,7 +296,10 @@ export async function login(input: LoginInput, meta: SessionMeta): Promise<AuthR
           : null;
       })();
 
-  if (!user?.passwordHash || !(await verifyPassword(user.passwordHash, input.password))) {
+  if (
+    !user?.passwordHash ||
+    !(await verifyPassword(user.passwordHash, input.password))
+  ) {
     throw new UnauthorizedError("Invalid email or password");
   }
 
@@ -268,12 +310,18 @@ export async function login(input: LoginInput, meta: SessionMeta): Promise<AuthR
     throw new ForbiddenError("This account is not active");
   }
 
-  await prisma.user.update({ where: { id: user.id }, data: { lastSeenAt: new Date() } });
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastSeenAt: new Date() },
+  });
 
   return issueSession(user, randomUUID(), meta);
 }
 
-export async function refresh(presentedToken: string, meta: SessionMeta): Promise<AuthResult> {
+export async function refresh(
+  presentedToken: string,
+  meta: SessionMeta,
+): Promise<AuthResult> {
   const tokenHash = hashRefreshToken(presentedToken);
   const stored = await prisma.refreshToken.findUnique({
     where: { tokenHash },
@@ -294,8 +342,10 @@ export async function refresh(presentedToken: string, meta: SessionMeta): Promis
     throw new UnauthorizedError("Session expired, please log in again");
   }
 
-  if (stored.expiresAt < new Date()) throw new UnauthorizedError("Session expired");
-  if (stored.user.status !== "ACTIVE") throw new UnauthorizedError("This account is not active");
+  if (stored.expiresAt < new Date())
+    throw new UnauthorizedError("Session expired");
+  if (stored.user.status !== "ACTIVE")
+    throw new UnauthorizedError("This account is not active");
 
   await prisma.refreshToken.update({
     where: { id: stored.id },
@@ -305,8 +355,10 @@ export async function refresh(presentedToken: string, meta: SessionMeta): Promis
   return issueSession(stored.user, stored.familyId, meta);
 }
 
-export async function logout(presentedToken: string | undefined): Promise<void> {
-  if (!presentedToken) return; 
+export async function logout(
+  presentedToken: string | undefined,
+): Promise<void> {
+  if (!presentedToken) return;
   await prisma.refreshToken.updateMany({
     where: { tokenHash: hashRefreshToken(presentedToken) },
     data: { revokedAt: new Date() },
@@ -329,8 +381,14 @@ export async function getMe(userId: string) {
       autoJoinBirthdayCommunities: true,
       emailVerifiedAt: true,
       createdAt: true,
+      onboardingComplete: true,   
+      profile: { select: { username: true } },
     },
   });
-  if (!user) throw new UnauthorizedError('Account no longer exists');
-  return user;
+  if (!user) throw new UnauthorizedError("Account no longer exists");
+  return {
+    ...user,
+    hasProfile: user.profile !== null,
+    username: user.profile?.username ?? null,
+  }
 }

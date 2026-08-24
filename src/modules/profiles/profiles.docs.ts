@@ -113,3 +113,19 @@ registerEndpoint({
   summary: 'Confirm the uploaded cover photo public id', secured: true,
   responses: { '200': { description: 'Updated profile' } },
 });
+
+registerEndpoint({
+  method: 'post',
+  path: '/profiles/me/complete-onboarding',
+  tag: 'Profiles',
+  summary: 'Mark onboarding as finished (call after the last onboarding step)',
+  secured: true,
+  responses: {
+    '200': {
+      description: 'Onboarding marked complete',
+      example: { data: { onboardingComplete: true } },
+    },
+    '400': { description: 'Profile not set up yet' },
+    '401': { description: 'Not authenticated' },
+  },
+});
