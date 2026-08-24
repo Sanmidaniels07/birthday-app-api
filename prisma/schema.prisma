@@ -139,6 +139,7 @@ model User {
 
   lastSeenAt DateTime?
   onboardingComplete            Boolean                  @default(false)   
+  onboardingStep     Int     @default(1)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 

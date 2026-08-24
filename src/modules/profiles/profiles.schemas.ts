@@ -77,3 +77,7 @@ export const confirmCoverSchema = z.object({
   version: z.coerce.number().int().positive().optional(),
 });
 export type ConfirmCoverInput = z.infer<typeof confirmCoverSchema>;
+
+export const onboardingStepSchema = z.object({
+  step: z.number().int().min(1).max(5),
+});

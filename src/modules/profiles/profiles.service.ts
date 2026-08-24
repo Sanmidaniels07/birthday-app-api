@@ -22,6 +22,44 @@ import { syncUserCommunities } from "../communities/communities.sync.js";
 import { logger } from "../../lib/logger.js";
 import { splitDate } from "../../utils/phone.js";
 
+/** Only move forward; never regress. */
+async function advanceOnboardingStep(userId: string, nextStep: number) {
+  await prisma.user.updateMany({
+    where: {
+      id: userId,
+      onboardingStep: { lt: nextStep },
+    },
+    data: { onboardingStep: nextStep },
+  });
+}
+
+export async function setOnboardingStep(userId: string, step: number) {
+  if (step < 1 || step > 5) {
+    throw new BadRequestError("Invalid onboarding step");
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { onboardingStep: true, onboardingComplete: true, profile: { select: { id: true } } },
+  });
+  if (!user) throw new NotFoundError("User");
+  if (user.onboardingComplete) {
+    return { onboardingStep: user.onboardingStep, onboardingComplete: true };
+  }
+
+  // Step 2+ requires a profile
+  if (step >= 2 && !user.profile) {
+    throw new BadRequestError("Profile must be set up first");
+  }
+
+  await advanceOnboardingStep(userId, step);
+
+  return {
+    onboardingStep: Math.max(user.onboardingStep, step),
+    onboardingComplete: false,
+  };
+}
+
 
 export async function isUsernameAvailable(u: string): Promise<boolean> {
   const existing = await prisma.profile.findUnique({
@@ -98,6 +136,7 @@ export async function setupProfile(userId: string, input: SetupProfileInput) {
     logger.error({ err, userId }, "community sync on setup failed"),
   );
 
+  await advanceOnboardingStep(userId, 2);
   return profile;
 }
 
@@ -279,7 +318,7 @@ export async function setMyInterests(userId: string, interestIds: string[]) {
       data: interestIds.map((interestId) => ({ userId, interestId })),
     }),
   ]);
-
+  await advanceOnboardingStep(userId, 3);
   return listMyInterests(userId);
 }
 
@@ -422,12 +461,14 @@ export async function confirmCoverUpload(userId: string, publicId: string, versi
     },
   });
 }
+
 export async function completeOnboarding(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {
       id: true,
       onboardingComplete: true,
+      onboardingStep: true,
       profile: { select: { id: true } },
     },
   });
@@ -435,13 +476,17 @@ export async function completeOnboarding(userId: string) {
   if (!user.profile) throw new BadRequestError("Profile must be set up first");
 
   if (user.onboardingComplete) {
-    return { onboardingComplete: true };
+    return { onboardingComplete: true, onboardingStep: user.onboardingStep };
   }
 
   await prisma.user.update({
     where: { id: userId },
-    data: { onboardingComplete: true },
+    data: {
+      onboardingComplete: true,
+      onboardingStep: 5,
+    },
   });
 
-  return { onboardingComplete: true };
+  return { onboardingComplete: true, onboardingStep: 5 };
 }
+

@@ -67,6 +67,10 @@ export async function confirmCover(req: Request, res: Response) {
   ok(res, await profilesService.confirmCoverUpload(req.user!.sub, req.body.publicId, req.body.version));
 }
 
+export async function setOnboardingStep(req: Request, res: Response) {
+  ok(res, await profilesService.setOnboardingStep(req.user!.sub, req.body.step));
+}
+
 export async function completeOnboarding(req: Request, res: Response) {
   ok(res, await profilesService.completeOnboarding(req.user!.sub));
 }

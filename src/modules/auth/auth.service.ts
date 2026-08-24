@@ -57,6 +57,7 @@ interface AuthResult {
     username: string | null;
     hasProfile: boolean;
     onboardingComplete: boolean;
+    onboardingStep: number;
   };
 }
 
@@ -243,6 +244,7 @@ async function issueSession(
     email: string;
     role: "USER" | "MODERATOR" | "ADMIN";
     onboardingComplete: boolean;
+    onboardingStep: number;
     profile: { username: string } | null;
   },
   familyId: string,
@@ -272,6 +274,7 @@ async function issueSession(
       username: user.profile?.username ?? null,
       hasProfile: user.profile !== null,
       onboardingComplete: user.onboardingComplete,
+      onboardingStep: user.onboardingStep,
     },
   };
 }

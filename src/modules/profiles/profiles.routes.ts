@@ -23,6 +23,13 @@ profilesRouter.post("/setup", requireAuth, validate({ body: setupProfileSchema }
 profilesRouter.get("/me", requireAuth, controller.myProfile);
 profilesRouter.patch("/me", requireAuth, validate({ body: updateProfileSchema }), controller.update);
 
+profilesRouter.patch(
+  "/me/onboarding-step",
+  requireAuth,
+  validate({ body: onboardingStepSchema }),
+  controller.setOnboardingStep,
+);
+
 profilesRouter.post(
   "/me/complete-onboarding",
   requireAuth,

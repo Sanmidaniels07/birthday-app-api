@@ -129,3 +129,19 @@ registerEndpoint({
     '401': { description: 'Not authenticated' },
   },
 });
+
+registerEndpoint({
+  method: 'patch',
+  path: '/profiles/me/onboarding-step',
+  tag: 'Profiles',
+  summary: 'Set onboarding progress (step 1–5; only moves forward)',
+  secured: true,
+  body: onboardingStepSchema,
+  responses: {
+    '200': {
+      description: 'Updated step',
+      example: { data: { onboardingStep: 4, onboardingComplete: false } },
+    },
+    '400': { description: 'Invalid step or profile not set up' },
+  },
+});
