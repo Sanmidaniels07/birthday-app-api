@@ -279,6 +279,19 @@ async function issueSession(
   };
 }
 
+const authUserSelect = {
+  id: true,
+  fullName: true,
+  email: true,
+  passwordHash: true,
+  role: true,
+  status: true,
+  emailVerifiedAt: true,
+  onboardingComplete: true,
+  onboardingStep: true,
+  profile: { select: { username: true } },
+} as const;
+
 export async function login(
   input: LoginInput,
   meta: SessionMeta,
@@ -287,14 +300,14 @@ export async function login(
   const user = isEmail
     ? await prisma.user.findUnique({
         where: { email: input.identifier.toLowerCase() },
-        include: { profile: { select: { username: true } } },
+        select: authUserSelect,
       })
     : await (async () => {
         const normalized = normalizePhone(input.identifier);
         return normalized
           ? prisma.user.findUnique({
               where: { phone: normalized },
-              include: { profile: { select: { username: true } } },
+              select: authUserSelect,
             })
           : null;
       })();
@@ -320,7 +333,6 @@ export async function login(
 
   return issueSession(user, randomUUID(), meta);
 }
-
 export async function refresh(
   presentedToken: string,
   meta: SessionMeta,
@@ -328,7 +340,9 @@ export async function refresh(
   const tokenHash = hashRefreshToken(presentedToken);
   const stored = await prisma.refreshToken.findUnique({
     where: { tokenHash },
-    include: { user: { include: { profile: { select: { username: true } } } } },
+    include: {
+      user: { select: authUserSelect },
+    },
   });
 
   if (!stored) throw new UnauthorizedError("Invalid session");
@@ -367,7 +381,6 @@ export async function logout(
     data: { revokedAt: new Date() },
   });
 }
-
 export async function getMe(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -384,7 +397,8 @@ export async function getMe(userId: string) {
       autoJoinBirthdayCommunities: true,
       emailVerifiedAt: true,
       createdAt: true,
-      onboardingComplete: true,   
+      onboardingComplete: true,
+      onboardingStep: true,   
       profile: { select: { username: true } },
     },
   });
@@ -393,5 +407,5 @@ export async function getMe(userId: string) {
     ...user,
     hasProfile: user.profile !== null,
     username: user.profile?.username ?? null,
-  }
+  };
 }
