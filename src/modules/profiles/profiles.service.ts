@@ -87,15 +87,20 @@ const MONTH_TINTS = [
 export function defaultBlobTint(birthMonth: number): string {
   return MONTH_TINTS[birthMonth - 1] ?? "powder";
 }
-
 export async function setupProfile(userId: string, input: SetupProfileInput) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { birthMonth: true, profile: { select: { id: true } } },
+    select: { birthMonth: true, onboardingStep: true, profile: { select: { id: true } } },
   });
   if (!user) throw new NotFoundError("User");
-  if (user.profile)
+
+  if (user.profile) {
+    
+    if (user.onboardingStep < 2) {
+      await advanceOnboardingStep(userId, 2);
+    }
     throw new ConflictError("Profile already set up — use update instead");
+  }
 
   let profile;
   try {
@@ -131,7 +136,6 @@ export async function setupProfile(userId: string, input: SetupProfileInput) {
     });
   }
 
-  // Intentionally leave onboardingComplete = false
   void syncUserCommunities(userId).catch((err) =>
     logger.error({ err, userId }, "community sync on setup failed"),
   );
