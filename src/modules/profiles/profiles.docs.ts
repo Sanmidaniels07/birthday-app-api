@@ -5,6 +5,7 @@ import {
   usernameQuerySchema,
   setInterestsSchema,
   confirmAvatarSchema,
+  onboardingStepSchema,
 } from './profiles.schemas.js';
 
 registerEndpoint({

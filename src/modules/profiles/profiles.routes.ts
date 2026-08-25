@@ -12,6 +12,7 @@ import {
   searchQuerySchema,
   username,
   confirmCoverSchema,
+  onboardingStepSchema,
 } from "./profiles.schemas.js";
 import * as controller from "./profiles.controller.js";
 
