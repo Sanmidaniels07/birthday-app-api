@@ -157,7 +157,6 @@ export async function unfriend(actorId: string, targetUsername: string) {
   await prisma.friendship.delete({ where: { id: friendship.id } });
   return { unfriended: true };
 }
-
 export async function listFriends(userId: string) {
   const rows = await prisma.friendship.findMany({
     where: {
@@ -172,11 +171,13 @@ export async function listFriends(userId: string) {
       addressee: { select: friendCardSelect },
     },
   });
-  // The friend is whichever side isn't me.
-  return rows.map((r) => {
-    const other = r.requesterId === userId ? r.addressee : r.requester;
-    return { ...other.profile, friendsSince: r.respondedAt };
-  });
+  
+  return rows
+    .filter((r) => (r.requesterId === userId ? r.addressee : r.requester).profile !== null)
+    .map((r) => {
+      const other = r.requesterId === userId ? r.addressee : r.requester;
+      return { ...other.profile, friendsSince: r.respondedAt };
+    });
 }
 
 export async function listRequests(userId: string, direction: 'incoming' | 'outgoing') {
