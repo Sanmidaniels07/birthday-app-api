@@ -96,3 +96,37 @@ registerEndpoint({
   summary: 'Edit my post caption (text only, no time limit)', secured: true,
   responses: { '200': { description: 'Updated post' } },
 });
+
+registerEndpoint({
+  method: 'post',
+  path: '/feed/posts/{postId}/repost',
+  tag: 'Feed',
+  summary: 'Toggle a repost (create if missing, remove if already reposted)',
+  secured: true,
+  responses: {
+    '200': {
+      description: 'New state',
+      example: { data: { reposted: true } },
+    },
+    '400': { description: 'Reposting own post' },
+    '404': { description: 'Post missing, deleted, or blocked author' },
+  },
+});
+
+registerEndpoint({
+  method: 'get',
+  path: '/feed/by/{username}/reposts',
+  tag: 'Feed',
+  summary: "A user's reposts (gated like their profile); cursor pagination",
+  secured: true,
+  responses: {
+    '200': {
+      description: 'Post cards with repost metadata',
+      example: {
+        data: [{ id: 'ckx…', body: 'Hello!', repostedAt: '2026-09-01T12:00:00Z' }],
+        meta: { cursor: '…', hasMore: false },
+      },
+    },
+    '404': { description: 'Not found, private, friends-only, or blocked' },
+  },
+});

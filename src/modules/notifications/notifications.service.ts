@@ -11,7 +11,7 @@ import { pushEnabled } from '../../lib/push.js';
 type NotificationTypeName =
   | 'FRIEND_REQUEST' | 'FRIEND_ACCEPTED' | 'NEW_MESSAGE' | 'MISSED_CALL'
   | 'UPCOMING_BIRTHDAY' | 'BIRTHDAY_TODAY' | 'POST_REACTION' | 'POST_COMMENT'
-  | 'COMMUNITY_JOINED' | 'ANNOUNCEMENT';
+  | 'COMMUNITY_JOINED' | 'ANNOUNCEMENT' | 'POST_REPOST';
 
 /** Which preference gates which type. Unlisted types are ungated (always dispatch). */
 const PUSH_GATE: Partial<Record<NotificationTypeName, keyof PushPrefs>> = {
@@ -23,6 +23,7 @@ const PUSH_GATE: Partial<Record<NotificationTypeName, keyof PushPrefs>> = {
   FRIEND_ACCEPTED: 'pushSocial',
   POST_REACTION: 'pushSocial',
   POST_COMMENT: 'pushSocial',
+  POST_REPOST: 'pushSocial',
 };
 
 interface PushPrefs {

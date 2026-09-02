@@ -154,7 +154,6 @@ const publicProfileSelect = {
   visibility: true,
   createdAt: true,
 } as const;
-
 export async function getProfileByUsername(username: string, viewerId: string) {
   const profile = await prisma.profile.findUnique({
     where: { username },
@@ -224,6 +223,24 @@ export async function getProfileByUsername(username: string, viewerId: string) {
     throw new NotFoundError("Profile");
   }
 
+  const [friendCount, communityCount, postCount] = await Promise.all([
+    prisma.friendship.count({
+      where: {
+        status: "ACCEPTED",
+        OR: [
+          { requesterId: profile.userId },
+          { addresseeId: profile.userId },
+        ],
+      },
+    }),
+    prisma.communityMembership.count({
+      where: { userId: profile.userId },
+    }),
+    prisma.post.count({
+      where: { authorId: profile.userId, deletedAt: null },
+    }),
+  ]);
+
   return {
     username: profile.username,
     displayName: profile.displayName,
@@ -261,6 +278,9 @@ export async function getProfileByUsername(username: string, viewerId: string) {
     ...(profile.showAnniversary || isOwner
       ? { anniversaryMonth: profile.user.anniversaryMonth, anniversaryDay: profile.user.anniversaryDay }
       : {}),
+    friendCount,
+    communityCount,
+    postCount,
   };
 }
 

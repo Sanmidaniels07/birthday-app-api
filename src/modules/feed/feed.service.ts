@@ -372,3 +372,83 @@ export async function editPost(userId: string, postId: string, body: string) {
     select: postCardSelect, // whatever your existing post-response select is named
   });
 }
+
+export async function toggleRepost(actorId: string, postId: string) {
+  const post = await interactablePost(actorId, postId);
+
+  if (post.authorId === actorId) {
+    throw new BadRequestError('You can’t repost your own post');
+  }
+
+  const existing = await prisma.repost.findUnique({
+    where: { userId_postId: { userId: actorId, postId } },
+    select: { id: true },
+  });
+
+  if (existing) {
+    await prisma.repost.delete({ where: { id: existing.id } });
+    return { reposted: false };
+  }
+
+  await prisma.repost.create({
+    data: { userId: actorId, postId },
+  });
+
+  const actor = await prisma.profile.findUnique({
+    where: { userId: actorId },
+    select: { displayName: true },
+  });
+
+  void dispatch({
+    recipientId: post.authorId,
+    actorId,
+    type: 'POST_REPOST', // if you added the enum
+    title: `${actor?.displayName ?? 'Someone'} reposted your post`,
+    entityType: 'post',
+    entityId: postId,
+  });
+
+  return { reposted: true };
+}
+
+export async function authorReposts(
+  viewerId: string,
+  username: string,
+  opts: { cursor?: string; limit: number },
+) {
+  const { getProfileByUsername } = await import('../profiles/profiles.service.js');
+  await getProfileByUsername(username, viewerId);
+
+  const profile = await prisma.profile.findUnique({
+    where: { username },
+    select: { userId: true },
+  });
+  if (!profile) throw new NotFoundError('User');
+
+  const rows = await prisma.repost.findMany({
+    where: { userId: profile.userId, post: { deletedAt: null } },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: opts.limit + 1,
+    ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
+    select: {
+      id: true,
+      createdAt: true,
+      post: { select: postCardSelect },
+    },
+  });
+
+  const hasMore = rows.length > opts.limit;
+  const page = hasMore ? rows.slice(0, opts.limit) : rows;
+
+  return {
+    page: page.map((r) => ({
+      ...r.post,
+      repostedAt: r.createdAt,
+      repostId: r.id,
+    })),
+    meta: {
+      cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+      hasMore,
+    },
+  };
+}

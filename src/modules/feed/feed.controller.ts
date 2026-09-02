@@ -61,3 +61,20 @@ export async function birthdays(req: Request, res: Response) {
 export async function editPost(req: Request, res: Response) {
   ok(res, await service.editPost(req.user!.sub, req.params.postId as string, req.body.body));
 }
+
+export async function repost(req: Request, res: Response) {
+  ok(
+    res,
+    await service.toggleRepost(req.user!.sub, req.params.postId as string),
+  );
+}
+
+export async function byAuthorReposts(req: Request, res: Response) {
+  const { cursor, limit } = req.query as { cursor?: string; limit?: string };
+  const result = await service.authorReposts(
+    req.user!.sub,
+    req.params.username as string,
+    { cursor, limit: Number(limit ?? 20) },
+  );
+  ok(res, result.page, result.meta);
+}
