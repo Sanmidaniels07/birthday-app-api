@@ -12,7 +12,7 @@ export async function remove(req: Request, res: Response) {
   ok(res, await service.deletePost(req.user!.sub, req.params.postId as string));
 }
 export async function detail(req: Request, res: Response) {
-  ok(res, await service.getPost(req.params.postId as string));
+  ok(res, await service.getPost(req.user!.sub, req.params.postId as string));
 }
 export async function home(req: Request, res: Response) {
   const { cursor, limit } = req.query as { cursor?: string; limit?: string };
@@ -77,4 +77,11 @@ export async function byAuthorReposts(req: Request, res: Response) {
     { cursor, limit: Number(limit ?? 20) },
   );
   ok(res, result.page, result.meta);
+}
+
+export async function undoRepost(req: Request, res: Response) {
+  ok(
+    res,
+    await service.removeRepost(req.user!.sub, req.params.postId as string),
+  );
 }

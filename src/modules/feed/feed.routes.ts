@@ -73,6 +73,14 @@ feedRouter.post(
   controller.repost,
 );
 
+feedRouter.delete(
+  '/posts/:postId/repost',
+  interactionLimiter,
+  validate({ params: postIdParam }),
+  controller.undoRepost,
+);
+
+
 feedRouter.post(
   "/posts/:postId/comments",
   interactionLimiter,

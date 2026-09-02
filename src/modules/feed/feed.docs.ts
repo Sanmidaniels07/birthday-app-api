@@ -130,3 +130,18 @@ registerEndpoint({
     '404': { description: 'Not found, private, friends-only, or blocked' },
   },
 });
+
+registerEndpoint({
+  method: 'delete',
+  path: '/feed/posts/{postId}/repost',
+  tag: 'Feed',
+  summary: 'Undo my repost of this post (idempotent if not reposted)',
+  secured: true,
+  responses: {
+    '200': {
+      description: 'Repost removed',
+      example: { data: { reposted: false } },
+    },
+    '404': { description: 'Post missing, deleted, or blocked author' },
+  },
+});

@@ -27,9 +27,29 @@ export const postCardSelect = {
     orderBy: { order: 'asc' as const },
     select: { url: true, type: true, width: true, height: true },
   },
-  _count: { select: { comments: { where: { deletedAt: null } }, reactions: true } },
+  _count: { select: { comments: { where: { deletedAt: null } }, reactions: true, reposts: true, } },
 } as const;
 
+async function withRepostState<T extends { id: string }>(
+  viewerId: string,
+  posts: T[],
+): Promise<(T & { repostedByMe: boolean })[]> {
+  if (posts.length === 0) return [];
+
+  const mine = await prisma.repost.findMany({
+    where: {
+      userId: viewerId,
+      postId: { in: posts.map((p) => p.id) },
+    },
+    select: { postId: true },
+  });
+  const set = new Set(mine.map((r) => r.postId));
+
+  return posts.map((p) => ({
+    ...p,
+    repostedByMe: set.has(p.id),
+  }));
+}
 // ---- Post creation & lifecycle ----
 
 export function getPostMediaSignature(userId: string) {
@@ -101,14 +121,15 @@ export async function deletePost(actorId: string, postId: string) {
   return { deleted: true };
 }
 
-export async function getPost(postId: string) {
+export async function getPost(viewerId: string,postId: string) {
   const post = await prisma.post.findUnique({
     where: { id: postId },
     select: { ...postCardSelect, deletedAt: true },
   });
   if (!post || post.deletedAt) throw new NotFoundError('Post');
   const { deletedAt: _omit, ...card } = post;
-  return card;
+  const [enriched] = await withRepostState(viewerId, [card]);
+  return enriched;
 }
 
 // ---- Feeds ----
@@ -132,7 +153,9 @@ export async function homeFeed(userId: string, opts: { cursor?: string; limit: n
 
   const hasMore = rows.length > opts.limit;
   const page = hasMore ? rows.slice(0, opts.limit) : rows;
-  return { page, meta: { cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null, hasMore } };
+
+  const pageWithState = await withRepostState(userId, page);
+  return { page: pageWithState, meta: { cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null, hasMore } };
 }
 
 export async function authorFeed(
@@ -160,7 +183,8 @@ export async function authorFeed(
 
   const hasMore = rows.length > opts.limit;
   const page = hasMore ? rows.slice(0, opts.limit) : rows;
-  return { page, meta: { cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null, hasMore } };
+  const pageWithState = await withRepostState(viewerId, page);
+  return { page: pageWithState, meta: { cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null, hasMore } };
 }
 
 // ---- Reactions ----
@@ -451,4 +475,20 @@ export async function authorReposts(
       hasMore,
     },
   };
+}
+
+export async function removeRepost(actorId: string, postId: string) {
+  await interactablePost(actorId, postId);
+
+  const existing = await prisma.repost.findUnique({
+    where: { userId_postId: { userId: actorId, postId } },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    return { reposted: false };
+  }
+
+  await prisma.repost.delete({ where: { id: existing.id } });
+  return { reposted: false };
 }
