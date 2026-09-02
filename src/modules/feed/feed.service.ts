@@ -1,15 +1,29 @@
-import { prisma } from '../../lib/prisma.js';
-import { BadRequestError, NotFoundError } from '../../utils/errors.js';
-import { cloudinaryEnabled, signPostMediaUpload, MEDIA_ROOT } from '../../lib/cloudinary.js';
-import type { CreatePostInput } from './feed.schemas.js';
-import { livePost, blockedIdsFor, feedAuthorIdsFor } from './feed.visibility.js';
-import { blockExistsBetween } from '../social/social.helpers.js';
-import { dispatch } from '../notifications/notifications.service.js';
+import { prisma } from "../../lib/prisma.js";
+import { BadRequestError, NotFoundError } from "../../utils/errors.js";
+import {
+  cloudinaryEnabled,
+  signPostMediaUpload,
+  MEDIA_ROOT,
+} from "../../lib/cloudinary.js";
+import type { CreatePostInput } from "./feed.schemas.js";
+import {
+  livePost,
+  blockedIdsFor,
+  feedAuthorIdsFor,
+} from "./feed.visibility.js";
+import { blockExistsBetween } from "../social/social.helpers.js";
+import { dispatch } from "../notifications/notifications.service.js";
 
 /** Is it this user's birthday today (UTC)? */
-function isBirthdayTodayUTC(user: { birthMonth: number; birthDay: number }): boolean {
+function isBirthdayTodayUTC(user: {
+  birthMonth: number;
+  birthDay: number;
+}): boolean {
   const now = new Date();
-  return user.birthMonth === now.getUTCMonth() + 1 && user.birthDay === now.getUTCDate();
+  return (
+    user.birthMonth === now.getUTCMonth() + 1 &&
+    user.birthDay === now.getUTCDate()
+  );
 }
 
 /** The one post shape every feed/detail response uses. */
@@ -20,14 +34,27 @@ export const postCardSelect = {
   createdAt: true,
   author: {
     select: {
-      profile: { select: { username: true, displayName: true, avatarUrl: true, blobTint: true } },
+      profile: {
+        select: {
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+          blobTint: true,
+        },
+      },
     },
   },
   media: {
-    orderBy: { order: 'asc' as const },
+    orderBy: { order: "asc" as const },
     select: { url: true, type: true, width: true, height: true },
   },
-  _count: { select: { comments: { where: { deletedAt: null } }, reactions: true, reposts: true, } },
+  _count: {
+    select: {
+      comments: { where: { deletedAt: null } },
+      reactions: true,
+      reposts: true,
+    },
+  },
 } as const;
 
 async function withRepostState<T extends { id: string }>(
@@ -54,7 +81,9 @@ async function withRepostState<T extends { id: string }>(
 
 export function getPostMediaSignature(userId: string) {
   if (!cloudinaryEnabled) {
-    throw new BadRequestError('Media uploads are not configured on this server');
+    throw new BadRequestError(
+      "Media uploads are not configured on this server",
+    );
   }
   return signPostMediaUpload(userId);
 }
@@ -64,7 +93,7 @@ export async function createPost(authorId: string, input: CreatePostInput) {
   const prefix = `${MEDIA_ROOT}/posts/${authorId}/`;
   for (const m of input.media ?? []) {
     if (!m.publicId.startsWith(prefix)) {
-      throw new BadRequestError('Unexpected media reference');
+      throw new BadRequestError("Unexpected media reference");
     }
   }
 
@@ -76,7 +105,9 @@ export async function createPost(authorId: string, input: CreatePostInput) {
       select: { birthMonth: true, birthDay: true },
     });
     if (!author || !isBirthdayTodayUTC(author)) {
-      throw new BadRequestError('Birthday posts can only be created on your birthday');
+      throw new BadRequestError(
+        "Birthday posts can only be created on your birthday",
+      );
     }
     isBirthdayPost = true;
   }
@@ -111,7 +142,7 @@ export async function deletePost(actorId: string, postId: string) {
   });
   // Missing, already deleted, or not yours → the same 404. No oracle.
   if (!post || post.deletedAt || post.authorId !== actorId) {
-    throw new NotFoundError('Post');
+    throw new NotFoundError("Post");
   }
 
   await prisma.post.update({
@@ -121,12 +152,12 @@ export async function deletePost(actorId: string, postId: string) {
   return { deleted: true };
 }
 
-export async function getPost(viewerId: string,postId: string) {
+export async function getPost(viewerId: string, postId: string) {
   const post = await prisma.post.findUnique({
     where: { id: postId },
     select: { ...postCardSelect, deletedAt: true },
   });
-  if (!post || post.deletedAt) throw new NotFoundError('Post');
+  if (!post || post.deletedAt) throw new NotFoundError("Post");
   const { deletedAt: _omit, ...card } = post;
   const [enriched] = await withRepostState(viewerId, [card]);
   return enriched;
@@ -134,7 +165,10 @@ export async function getPost(viewerId: string,postId: string) {
 
 // ---- Feeds ----
 
-export async function homeFeed(userId: string, opts: { cursor?: string; limit: number }) {
+export async function homeFeed(
+  userId: string,
+  opts: { cursor?: string; limit: number },
+) {
   const [authorIds, blockedIds] = await Promise.all([
     feedAuthorIdsFor(userId),
     blockedIdsFor(userId),
@@ -145,7 +179,7 @@ export async function homeFeed(userId: string, opts: { cursor?: string; limit: n
 
   const rows = await prisma.post.findMany({
     where: { ...livePost, authorId: { in: visibleAuthors } },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: opts.limit + 1,
     ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
     select: postCardSelect,
@@ -155,7 +189,13 @@ export async function homeFeed(userId: string, opts: { cursor?: string; limit: n
   const page = hasMore ? rows.slice(0, opts.limit) : rows;
 
   const pageWithState = await withRepostState(userId, page);
-  return { page: pageWithState, meta: { cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null, hasMore } };
+  return {
+    page: pageWithState,
+    meta: {
+      cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+      hasMore,
+    },
+  };
 }
 
 export async function authorFeed(
@@ -163,19 +203,19 @@ export async function authorFeed(
   username: string,
   opts: { cursor?: string; limit: number },
 ) {
-  
-  const { getProfileByUsername } = await import('../profiles/profiles.service.js');
+  const { getProfileByUsername } =
+    await import("../profiles/profiles.service.js");
   await getProfileByUsername(username, viewerId);
 
   const profile = await prisma.profile.findUnique({
     where: { username },
     select: { userId: true },
   });
-  if (!profile) throw new NotFoundError('User'); 
+  if (!profile) throw new NotFoundError("User");
 
   const rows = await prisma.post.findMany({
     where: { ...livePost, authorId: profile.userId },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: opts.limit + 1,
     ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
     select: postCardSelect,
@@ -184,7 +224,13 @@ export async function authorFeed(
   const hasMore = rows.length > opts.limit;
   const page = hasMore ? rows.slice(0, opts.limit) : rows;
   const pageWithState = await withRepostState(viewerId, page);
-  return { page: pageWithState, meta: { cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null, hasMore } };
+  return {
+    page: pageWithState,
+    meta: {
+      cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+      hasMore,
+    },
+  };
 }
 
 // ---- Reactions ----
@@ -195,14 +241,21 @@ async function interactablePost(actorId: string, postId: string) {
     where: { id: postId },
     select: { id: true, authorId: true, deletedAt: true },
   });
-  if (!post || post.deletedAt) throw new NotFoundError('Post');
-  if (post.authorId !== actorId && (await blockExistsBetween(actorId, post.authorId))) {
-    throw new NotFoundError('Post');
+  if (!post || post.deletedAt) throw new NotFoundError("Post");
+  if (
+    post.authorId !== actorId &&
+    (await blockExistsBetween(actorId, post.authorId))
+  ) {
+    throw new NotFoundError("Post");
   }
   return post;
 }
 
-export async function togglePostReaction(actorId: string, postId: string, emoji: string) {
+export async function togglePostReaction(
+  actorId: string,
+  postId: string,
+  emoji: string,
+) {
   // Shape/abuse validation (single emoji, not arbitrary text) now lives
   // entirely in reactionSchema — no allow-list gate here anymore, so any
   // emoji the schema accepts is a valid reaction.
@@ -215,7 +268,7 @@ export async function togglePostReaction(actorId: string, postId: string, emoji:
 
   if (existing) {
     await prisma.reaction.delete({ where: { id: existing.id } });
-    return { emoji, reacted: false }; 
+    return { emoji, reacted: false };
   }
 
   await prisma.reaction.create({ data: { userId: actorId, postId, emoji } });
@@ -228,9 +281,9 @@ export async function togglePostReaction(actorId: string, postId: string, emoji:
   void dispatch({
     recipientId: post.authorId,
     actorId,
-    type: 'POST_REACTION',
-    title: `${actor?.displayName ?? 'Someone'} reacted ${emoji} to your post`,
-    entityType: 'post',
+    type: "POST_REACTION",
+    title: `${actor?.displayName ?? "Someone"} reacted ${emoji} to your post`,
+    entityType: "post",
     entityId: postId,
   });
 
@@ -240,7 +293,7 @@ export async function togglePostReaction(actorId: string, postId: string, emoji:
 export async function postReactions(actorId: string, postId: string) {
   await interactablePost(actorId, postId);
   const rows = await prisma.reaction.groupBy({
-    by: ['emoji'],
+    by: ["emoji"],
     where: { postId },
     _count: { emoji: true },
   });
@@ -250,7 +303,11 @@ export async function postReactions(actorId: string, postId: string) {
   });
   const mySet = new Set(mine.map((r) => r.emoji));
   return rows
-    .map((r) => ({ emoji: r.emoji, count: r._count.emoji, reactedByMe: mySet.has(r.emoji) }))
+    .map((r) => ({
+      emoji: r.emoji,
+      count: r._count.emoji,
+      reactedByMe: mySet.has(r.emoji),
+    }))
     .sort((a, b) => b.count - a.count);
 }
 
@@ -263,10 +320,19 @@ const commentCardSelect = {
   createdAt: true,
   author: {
     select: {
-      profile: { select: { username: true, displayName: true, avatarUrl: true, blobTint: true } },
+      profile: {
+        select: {
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+          blobTint: true,
+        },
+      },
     },
   },
-  _count: { select: { replies: { where: { deletedAt: null } }, reactions: true } },
+  _count: {
+    select: { replies: { where: { deletedAt: null } }, reactions: true },
+  },
 } as const;
 
 export async function addComment(
@@ -283,10 +349,12 @@ export async function addComment(
       select: { id: true, postId: true, parentId: true, deletedAt: true },
     });
     if (!parent || parent.deletedAt || parent.postId !== postId) {
-      throw new NotFoundError('Comment');
+      throw new NotFoundError("Comment");
     }
     if (parent.parentId !== null) {
-      throw new BadRequestError('Replies to replies are not supported — reply to the top-level comment');
+      throw new BadRequestError(
+        "Replies to replies are not supported — reply to the top-level comment",
+      );
     }
   }
 
@@ -302,10 +370,10 @@ export async function addComment(
   void dispatch({
     recipientId: post.authorId,
     actorId,
-    type: 'POST_COMMENT',
-    title: `${actor?.displayName ?? 'Someone'} commented on your post`,
+    type: "POST_COMMENT",
+    title: `${actor?.displayName ?? "Someone"} commented on your post`,
     body: body.slice(0, 80),
-    entityType: 'post',
+    entityType: "post",
     entityId: postId,
   });
 
@@ -318,9 +386,12 @@ export async function deleteComment(actorId: string, commentId: string) {
     select: { id: true, authorId: true, deletedAt: true },
   });
   if (!comment || comment.deletedAt || comment.authorId !== actorId) {
-    throw new NotFoundError('Comment');
+    throw new NotFoundError("Comment");
   }
-  await prisma.comment.update({ where: { id: commentId }, data: { deletedAt: new Date() } });
+  await prisma.comment.update({
+    where: { id: commentId },
+    data: { deletedAt: new Date() },
+  });
   return { deleted: true };
 }
 
@@ -331,18 +402,17 @@ export async function listComments(
 ) {
   await interactablePost(actorId, postId);
 
-
   const rows = await prisma.comment.findMany({
     where: { postId, parentId: null, deletedAt: null },
- 
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     take: opts.limit + 1,
     ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
     select: {
       ...commentCardSelect,
       replies: {
         where: { deletedAt: null },
-        orderBy: { createdAt: 'asc' as const },
+        orderBy: { createdAt: "asc" as const },
         select: commentCardSelect,
       },
     },
@@ -350,11 +420,16 @@ export async function listComments(
 
   const hasMore = rows.length > opts.limit;
   const page = hasMore ? rows.slice(0, opts.limit) : rows;
-  return { page, meta: { cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null, hasMore } };
+  return {
+    page,
+    meta: {
+      cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+      hasMore,
+    },
+  };
 }
 
 // ---- Birthdays ----
-
 
 export async function birthdaysToday(viewerId: string) {
   const now = new Date();
@@ -363,7 +438,9 @@ export async function birthdaysToday(viewerId: string) {
     blockedIdsFor(viewerId),
   ]);
   const blockedSet = new Set(blockedIds);
-  const connections = authorIds.filter((id) => id !== viewerId && !blockedSet.has(id));
+  const connections = authorIds.filter(
+    (id) => id !== viewerId && !blockedSet.has(id),
+  );
   if (connections.length === 0) return [];
 
   const users = await prisma.user.findMany({
@@ -371,10 +448,17 @@ export async function birthdaysToday(viewerId: string) {
       id: { in: connections },
       birthMonth: now.getUTCMonth() + 1, // the composite index, one more time
       birthDay: now.getUTCDate(),
-      status: 'ACTIVE',
+      status: "ACTIVE",
     },
     select: {
-      profile: { select: { username: true, displayName: true, avatarUrl: true, blobTint: true } },
+      profile: {
+        select: {
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+          blobTint: true,
+        },
+      },
     },
   });
 
@@ -387,7 +471,7 @@ export async function editPost(userId: string, postId: string, body: string) {
     select: { authorId: true, deletedAt: true },
   });
   if (!post || post.deletedAt || post.authorId !== userId) {
-    throw new NotFoundError('Post');
+    throw new NotFoundError("Post");
   }
 
   return prisma.post.update({
@@ -401,7 +485,7 @@ export async function toggleRepost(actorId: string, postId: string) {
   const post = await interactablePost(actorId, postId);
 
   if (post.authorId === actorId) {
-    throw new BadRequestError('You can’t repost your own post');
+    throw new BadRequestError("You can’t repost your own post");
   }
 
   const existing = await prisma.repost.findUnique({
@@ -426,32 +510,32 @@ export async function toggleRepost(actorId: string, postId: string) {
   void dispatch({
     recipientId: post.authorId,
     actorId,
-    type: 'POST_REPOST', // if you added the enum
-    title: `${actor?.displayName ?? 'Someone'} reposted your post`,
-    entityType: 'post',
+    type: "POST_REPOST", // if you added the enum
+    title: `${actor?.displayName ?? "Someone"} reposted your post`,
+    entityType: "post",
     entityId: postId,
   });
 
   return { reposted: true };
 }
-
 export async function authorReposts(
   viewerId: string,
   username: string,
   opts: { cursor?: string; limit: number },
 ) {
-  const { getProfileByUsername } = await import('../profiles/profiles.service.js');
+  const { getProfileByUsername } =
+    await import("../profiles/profiles.service.js");
   await getProfileByUsername(username, viewerId);
 
   const profile = await prisma.profile.findUnique({
     where: { username },
     select: { userId: true },
   });
-  if (!profile) throw new NotFoundError('User');
+  if (!profile) throw new NotFoundError("User");
 
   const rows = await prisma.repost.findMany({
     where: { userId: profile.userId, post: { deletedAt: null } },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: opts.limit + 1,
     ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
     select: {
@@ -464,12 +548,13 @@ export async function authorReposts(
   const hasMore = rows.length > opts.limit;
   const page = hasMore ? rows.slice(0, opts.limit) : rows;
 
+  const postsWithState = await withRepostState(
+    viewerId,
+    page.map((r) => ({ ...r.post, repostedAt: r.createdAt, repostId: r.id })),
+  );
+
   return {
-    page: page.map((r) => ({
-      ...r.post,
-      repostedAt: r.createdAt,
-      repostId: r.id,
-    })),
+    page: postsWithState,
     meta: {
       cursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
       hasMore,
