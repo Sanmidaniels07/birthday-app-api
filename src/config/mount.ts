@@ -4,7 +4,7 @@ import { profilesRouter } from '../modules/profiles/profiles.routes.js';
 import { communitiesRouter } from '../modules/communities/communities.routes.js';
 import { matchingRouter } from '../modules/matching/matching.routes.js';
 import { socialRouter } from '../modules/social/social.routes.js';
-import { feedRouter } from '../modules/feed/feed.routes.js';
+// import { feedRouter } from '../modules/feed/feed.routes.js';
 import { chatRouter } from '../modules/chat/chat.routes.js';
 import { callsRouter } from '../modules/calls/calls.routes.js';
 import { notificationsRouter } from '../modules/notifications/notifications.routes.js';
@@ -25,7 +25,7 @@ export const MOUNTS: Array<{ path: string; router: Router; module: string }> = [
   { path: '/communities', router: communitiesRouter, module: 'communities' },
   { path: '/matching', router: matchingRouter, module: 'matching' },
   { path: '/social', router: socialRouter, module: 'social' },
-  { path: '/feed', router: feedRouter, module: 'feed' },
+  // { path: '/feed', router: feedRouter, module: 'feed' },
   { path: '/chat', router: chatRouter, module: 'chat' },
   { path: '/calls', router: callsRouter, module: 'calls' },
   { path: '/notifications', router: notificationsRouter, module: 'notifications' },
