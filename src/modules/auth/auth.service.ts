@@ -34,11 +34,9 @@ const MAX_OTP_ATTEMPTS = 5;
 
 export function computeAgeBracket(age: number): string | null {
   if (age < 18) return null;
-  if (age <= 25) return "18-25";
-  if (age <= 35) return "26-35";
-  if (age <= 45) return "36-45";
-  if (age <= 60) return "46-60";
-  return "60+";
+  if (age <= 25) return '18-25';
+  const start = 26 + Math.floor((age - 26) / 10) * 10;
+  return `${start}-${start + 9}`;
 }
 
 interface SessionMeta {
